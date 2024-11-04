@@ -34,7 +34,7 @@ Also, if used with a Yubikey:
 
 Disadvantages:
 - Building the applet might be a bit tricky;
-- The software implementation of HMAC-SHA512 could have an potential impact on the physical security against side-channel attacks (for attackers with physical access to the chip).
+- The software implementation of HMAC-SHA512 could have a potential impact on the physical security against side-channel attacks (for attackers with physical access to the chip).
 
 # Supported hardware
 
@@ -58,7 +58,7 @@ More info [here](http://www.swissbit.com/index.php?option=com_content&view=artic
 ### J3D081 JCOP v2.4.2 R2
 Available for purchase [here](https://www.motechno.com/product/j3d081-dual-interface-javacard-3-0-1/). (MOQ: 1 piece).
 
-# Buidl
+# Build
 
 You can build the javacard CAP files or use the lastest [built version](https://github.com/Toporin/SatochipApplet/releases).
 
