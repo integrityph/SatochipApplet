@@ -6,8 +6,6 @@ This document provides a complete list of APDU instructions used with SatoChip J
 
 [TOC]
 
-
-
 ## 2. APDU Specifications
 
 In APDU communication, a packet is sent to a Java Card applet which processes the request and sends back a response. This is the communication protocol used to communicate with the card using the ISO7816 chip connection or NFC.
@@ -144,3 +142,34 @@ This function allows the import of a private ECkey into the card.
 #### Response
 
 TODO
+
+### 3.3 Instruction `resetKey`
+
+#### Description
+
+This function allows to reset a private ECkey stored in the card. If 2FA is enabled, a hmac code must be provided to reset the key.
+
+**INS**: `0x33`
+
+**P1**: private key number `0x00` to `0x0f` (NOTE: if there is no key at the specified number the card will return `SW_INCORRECT_P1`)
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name                  | description                | length (bytes) | default value |
+| --------------------- | -------------------------- | -------------- | ------------- |
+| `HMAC-2FA` [optional] | 20 bytes HMAC key for 2FA. | 20             | NA            |
+
+#### Request Examples
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x33, 0x00, 0x00, 0x00
+}
+```
+
+#### Response
+
+TODO
+
