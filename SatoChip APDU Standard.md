@@ -109,50 +109,37 @@ TODO
 
 #### Description
 
-This instruction is supposed to be used one during the initialization of the card.
+This function allows the import of a private ECkey into the card.
 
 **INS**: `0x32`
 
-**P1**: private key number `0x00` to `0x0f` 
+**P1**: private key number `0x00` to `0x0f` (NOTE: if there is already a key at the specified number the card will return `SW_INCORRECT_P1`)
 
 **P2**: `0x00`
 
 **CDATA**:
 
-| name                  | description | length (bytes) | default value |
-| --------------------- | ----------- | -------------- | ------------- |
-| `key_encoding`        |             | 1              |               |
-| `key_type`            |             | 1              |               |
-| `key_size`            |             | 2              |               |
-| `RFU`                 |             | 6              |               |
-| `key_blob`            |             | var            |               |
-| `HMAC-2FA` [optional] |             | 20             | NA            |
+| name                  | description                                                  | length (bytes) | default value                          |
+| --------------------- | ------------------------------------------------------------ | -------------- | -------------------------------------- |
+| `key_encoding`        | `0x00` is `BLOB_ENC_PLAIN` which is the only supported value | 1              | `0x00`                                 |
+| `key_type`            | `0x0c` is `TYPE_EC_FP_PRIVATE` which is the only supported value | 1              | `0x0c`                                 |
+| `key_size`            | `0x0100` is `LENGTH_EC_FP_256` which is the only supported value | 2              | `{0x01, 0x00}` which is 256            |
+| `RFU`                 | Reserved for future use                                      | 6              | `{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}` |
+| `key_blob`            | The first two bytes are the `blob_size` encoded in `BIG ENDIAN`.  The which should be 32 or `{0x00, 0x20}`. The remaining 32 bytes should include the bytes of private key. | 34             | NA                                     |
+| `HMAC-2FA` [optional] | 20 bytes HMAC key for 2FA.                                   | 20             | NA                                     |
 
 #### Request Examples
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
-{  0xb0, 0x1a, 0x00, 0x00, 0x2c, 
-   0x08, // default_pin_length
-   0x4d, 0x75, 0x73, 0x63, 0x6c, 0x65, 0x30, 0x30, // default_pin
-   0x03, // pin_tries0
-   0x03, // ublk_tries0
-   0x04, // pin0_length
-   0x30, 0x30, 0x30, 0x30, // pin0
-   0x06, // ublk0_length
-   0x30, 0x30, 0x30, 0x30, 0x30, 0x30, // ublk0
-   0x04, // pin1_length
-   0x30, 0x31, 0x32, 0x33, // pin1
-   0x06, // ublk1_length
-   0x30, 0x31, 0x32, 0x33, 0x34, 0x35, // ublk1
-   0x01, 0xf4, // secmemsize
-   0x00, 0x00, // RFU
-   0x00, 0x00, 0x00, // RFU
-   0x00, 0x00 // option_flags
+{  0xb0, 0x32, 0x00, 0x00, 0x2c, 
+   0x00, // key_encoding
+   0x0c, // key_type
+   0x01, 0x00, // key_size
+   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //RFU
+   0x00, 0x20, ... // key_blob
 }
 ```
-
-
 
 #### Response
 
