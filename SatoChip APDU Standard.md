@@ -173,3 +173,28 @@ This function allows to reset a private ECkey stored in the card. If 2FA is enab
 
 TODO
 
+### 3.4 Instruction `getPublicKeyFromPrivate`
+
+#### Description
+
+This function returns the public key associated with a particular private key stored in the applet. The exact key blob contents depend on the key algorithm and type.
+
+**INS**: `0x35`
+
+**P1**: private key number `0x00` to `0x0f` (NOTE: if there is no key at the specified number the card will return `SW_INCORRECT_P1`)
+
+**P2**: `0x00`
+
+**CDATA**: None
+
+#### Request Examples
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x35, 0x00, 0x00, 0x00
+}
+```
+
+#### Response
+
+TODO
