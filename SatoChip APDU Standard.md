@@ -338,3 +338,34 @@ This example unblocks the PIN 0 using unblock code `000000`.
 #### Response
 
 TODO
+
+### 3.9 Instruction `listPINs`
+
+#### Description
+
+This function returns a 2 byte bit mask of the available PINs that are currently in use. Each set bit corresponds to an active PIN.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` error.
+
+**INS**: `0x48`
+
+**P1**: `0x00`
+
+**P2**: `0x00`
+
+**CDATA**: None
+
+#### Request Examples
+
+This example requests a list of all available PINs
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x48, 0x00, 0x00, 0x00,
+}
+```
+
+#### Response
+
+TODO
+
