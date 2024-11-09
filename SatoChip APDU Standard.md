@@ -469,7 +469,7 @@ This function imports a Bip32 seed to the applet and derives the master key and 
 
 #### Request Examples
 
-This example sets the label of the card as `test card`
+This example imports a BIP32 seed into the card.
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
@@ -498,13 +498,14 @@ This function resets the Bip32 seed and all derived keys: the master key, chain 
 
 **CDATA**:
 
-| name  | description                                                  | length (bytes) | default value              |
-| ----- | ------------------------------------------------------------ | -------------- | -------------------------- |
-| `PIN` | The pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
+| name                       | description                                                  | length (bytes) | default value              |
+| -------------------------- | ------------------------------------------------------------ | -------------- | -------------------------- |
+| `PIN`                      | The pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
+| `optional-hmac` [optional] | 20 bytes HMAC key for 2FA.                                   | 20             | NA                         |
 
 #### Request Examples
 
-This example sets the label of the card as `test card`
+This example resets the BIP32 seed on the card
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
