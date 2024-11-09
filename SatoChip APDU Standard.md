@@ -252,7 +252,7 @@ This function verifies a PIN number sent by the DATA portion. The length of this
 
 | name  | description                                                  | length (bytes) | default value              |
 | ----- | ------------------------------------------------------------ | -------------- | -------------------------- |
-| `PIN` | The desired pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
+| `PIN` | The pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
 
 #### Request Examples
 
