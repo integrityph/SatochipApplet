@@ -431,12 +431,50 @@ This function allows to define or recover a short description of the card.
 
 #### Request Examples
 
-This example unblocks the PIN 0 using unblock code `000000`.
+This example sets the label of the card as `test card`
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
-{  0xb0, 0x3d, 0x00, 0x00, 0x06,
-   0x30, 0x30, 0x30, 0x30, 0x30, 0x30, // PUK
+{  0xb0, 0x3d, 0x00, 0x00, 0x0a,
+   0x09, // label_size
+   0x74, 0x65, 0x73, 0x74, 0x20, 0x63, 0x61, 0x72, 0x64, // label
+}
+```
+
+#### Response
+
+TODO
+
+### 3.12 Instruction `importBIP32Seed`
+
+#### Description
+
+This function imports a Bip32 seed to the applet and derives the master key and chain code. It also derives a second ECC that uniquely authenticates the HDwallet: the authentikey. Lastly, it derives a 32-bit AES key that is used to encrypt/decrypt Bip32 object stored in secure memory.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` error.
+
+**Note**: If the card has already been seeded with BIP32, you will get back an error `SW_BIP32_INITIALIZED_SEED` (`0x9c17`)
+
+**INS**: `0x6c`
+
+**P1**: seed_size(1 byte). This value should be between 0-64 otherwise the card throws an error `SW_WRONG_LENGTH` (`0x6700`)
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name        | description                                                  | length (bytes) | default value |
+| ----------- | ------------------------------------------------------------ | -------------- | ------------- |
+| `seed_data` | The BIP32 seed which is usually 64 bytes. This is not to be confused with BIP39 mnemonic phrase or its entropy. If you are starting with a mnemonic phrase, first derive a BIP32 seed from the entropy and send the derived seed. | var            | NA            |
+
+#### Request Examples
+
+This example sets the label of the card as `test card`
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x6c, 0x00, 0x00, 0x40,
+   0x54, 0xed, 0x02 ,0xf3 ... // seed_data (64 bytes)
 }
 ```
 
