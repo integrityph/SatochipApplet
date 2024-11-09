@@ -235,3 +235,34 @@ This function creates a PIN with parameters specified by the P1, P2 and DATA val
 #### Response
 
 TODO
+
+### 3.6 Instruction `verifyPIN`
+
+#### Description
+
+This function verifies a PIN number sent by the DATA portion. The length of this PIN is specified by the value contained in `LC`. Multiple consecutive unsuccessful PIN verifications will block the PIN. If a PIN blocks, then an UnblockPIN command can be issued.
+
+**INS**: `0x42`
+
+**P1**: PIN number `0x00`-`0x07` (NOTE: if there is no PIN at the specified number the card will return `SW_INCORRECT_P1`)
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name  | description                                                  | length (bytes) | default value              |
+| ----- | ------------------------------------------------------------ | -------------- | -------------------------- |
+| `PIN` | The desired pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
+
+#### Request Examples
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x40, 0x00, 0x00, 0x04,
+   0x30, 0x30, 0x30, 0x30, // PIN
+}
+```
+
+#### Response
+
+TODO
