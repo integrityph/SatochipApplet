@@ -111,7 +111,7 @@ This function allows the import of a private ECkey into the card.
 
 **INS**: `0x32`
 
-**P1**: private key number `0x00` to `0x0f` (NOTE: if there is already a key at the specified number the card will return `SW_INCORRECT_P1`)
+**P1**: private key number `0x00` to `0x0f` (NOTE: if there is already a key at the specified number the card will return `SW_INCORRECT_P1` (`0x9c10`))
 
 **P2**: `0x00`
 
@@ -151,7 +151,7 @@ This function allows to reset a private ECkey stored in the card. If 2FA is enab
 
 **INS**: `0x33`
 
-**P1**: private key number `0x00` to `0x0f` (NOTE: if there is no key at the specified number the card will return `SW_INCORRECT_P1`)
+**P1**: private key number `0x00` to `0x0f` (NOTE: if there is no key at the specified number the card will return `SW_INCORRECT_P1` (`0x9c10`))
 
 **P2**: `0x00`
 
@@ -181,7 +181,7 @@ This function returns the public key associated with a particular private key st
 
 **INS**: `0x35`
 
-**P1**: private key number `0x00` to `0x0f` (NOTE: if there is no key at the specified number the card will return `SW_INCORRECT_P1`)
+**P1**: private key number `0x00` to `0x0f` (NOTE: if there is no key at the specified number the card will return `SW_INCORRECT_P1` (`0x9c10`))
 
 **P2**: `0x00`
 
@@ -207,7 +207,7 @@ This function creates a PIN with parameters specified by the P1, P2 and DATA val
 
 **INS**: `0x40`
 
-**P1**: PIN number `0x00`-`0x07` (NOTE: if there is a PIN already at the specified number the card will return `SW_INCORRECT_P1`)
+**P1**: PIN number `0x00`-`0x07` (NOTE: if there is a PIN already at the specified number the card will return `SW_INCORRECT_P1` (`0x9c10`))
 
 **P2**: max attempt number `0x01`-`0x7f` (1-127)
 
@@ -244,7 +244,7 @@ This function verifies a PIN number sent by the DATA portion. The length of this
 
 **INS**: `0x42`
 
-**P1**: PIN number `0x00`-`0x07` (NOTE: if there is no PIN at the specified number the card will return `SW_INCORRECT_P1`)
+**P1**: PIN number `0x00`-`0x07` (NOTE: if there is no PIN at the specified number the card will return `SW_INCORRECT_P1` (`0x9c10`))
 
 **P2**: `0x00`
 
@@ -275,7 +275,7 @@ This function changes a PIN code. The DATA portion contains both the old and the
 
 **INS**: `0x44`
 
-**P1**: PIN number `0x00`-`0x07` (NOTE: if there is no PIN at the specified number the card will return `SW_INCORRECT_P1`)
+**P1**: PIN number `0x00`-`0x07` (NOTE: if there is no PIN at the specified number the card will return `SW_INCORRECT_P1` (`0x9c10`))
 
 **P2**: `0x00`
 
@@ -345,7 +345,7 @@ TODO
 
 This function returns a 2 byte bit mask of the available PINs that are currently in use. Each set bit corresponds to an active PIN.
 
-**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` error.
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
 
 **INS**: `0x48`
 
@@ -414,7 +414,7 @@ TODO
 
 This function allows to define or recover a short description of the card.
 
-**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` error.
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
 
 **INS**: `0x3d`
 
@@ -451,7 +451,7 @@ TODO
 
 This function imports a Bip32 seed to the applet and derives the master key and chain code. It also derives a second ECC that uniquely authenticates the HDwallet: the authentikey. Lastly, it derives a 32-bit AES key that is used to encrypt/decrypt Bip32 object stored in secure memory.
 
-**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` error.
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
 
 **Note**: If the card has already been seeded with BIP32, you will get back an error `SW_BIP32_INITIALIZED_SEED` (`0x9c17`)
 
