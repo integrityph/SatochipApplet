@@ -457,7 +457,7 @@ This function imports a Bip32 seed to the applet and derives the master key and 
 
 **INS**: `0x6c`
 
-**P1**: seed_size(1 byte). This value should be between 0-64 otherwise the card throws an error `SW_WRONG_LENGTH` (`0x6700`)
+**P1**: seed_size (1 byte). This value should be between 0-64 otherwise the card throws an error `SW_WRONG_LENGTH` (`0x6700`)
 
 **P2**: `0x00`
 
@@ -475,6 +475,41 @@ This example sets the label of the card as `test card`
 // CLA   INS   P1    P2    LC    CDATA ...
 {  0xb0, 0x6c, 0x00, 0x00, 0x40,
    0x54, 0xed, 0x02 ,0xf3 ... // seed_data (64 bytes)
+}
+```
+
+#### Response
+
+TODO
+
+### 3.13 Instruction `resetBIP32Seed`
+
+#### Description
+
+This function resets the Bip32 seed and all derived keys: the master key, chain code, authentikey and the 32-bit AES key that is used to encrypt/decrypt Bip32 object stored in secure memory. If 2FA is enabled, then a HMAC code must be provided, based on the 4-byte counter-2FA.
+
+**Note**: If the card has already been seeded with BIP32, you will get back an error `SW_BIP32_INITIALIZED_SEED` (`0x9c17`)
+
+**INS**: `0x77`
+
+**P1**: PIN_size (1 byte). This value should indicate the length of `PIN` in CDATA.
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name  | description                                                  | length (bytes) | default value              |
+| ----- | ------------------------------------------------------------ | -------------- | -------------------------- |
+| `PIN` | The pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
+
+#### Request Examples
+
+This example sets the label of the card as `test card`
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x77, 0x00, 0x00, 0x04,
+   0x30, 0x30, 0x30, 0x30 // PIN
 }
 ```
 
