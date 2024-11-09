@@ -258,8 +258,47 @@ This function verifies a PIN number sent by the DATA portion. The length of this
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
-{  0xb0, 0x40, 0x00, 0x00, 0x04,
+{  0xb0, 0x42, 0x00, 0x00, 0x04,
    0x30, 0x30, 0x30, 0x30, // PIN
+}
+```
+
+#### Response
+
+TODO
+
+### 3.7 Instruction `changePIN`
+
+#### Description
+
+This function changes a PIN code. The DATA portion contains both the old and the new PIN codes.
+
+**INS**: `0x44`
+
+**P1**: PIN number `0x00`-`0x07` (NOTE: if there is no PIN at the specified number the card will return `SW_INCORRECT_P1`)
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name       | description                                                  | length (bytes) | default value              |
+| ---------- | ------------------------------------------------------------ | -------------- | -------------------------- |
+| `PIN_size` | length of `old_PIN`                                          | 1              | `0x04`                     |
+| `old_PIN`  | The old pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
+| `PIN_size` | length of `new_PIN`                                          | 1              | `0x04`                     |
+| `new_PIN`  | The new pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x31, 0x31, 0x31, 0x31}` |
+
+#### Request Examples
+
+This example changes the PIN 0 from `0000` to `1111`
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x44, 0x00, 0x00, 0x0a,
+   0x04, // PIN_size
+   0x30, 0x30, 0x30, 0x30, // old_PIN
+   0x04, // PIN_size
+   0x31, 0x31, 0x31, 0x31, // new_PIN
 }
 ```
 
