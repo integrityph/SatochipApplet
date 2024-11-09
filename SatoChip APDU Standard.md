@@ -305,3 +305,36 @@ This example changes the PIN 0 from `0000` to `1111`
 #### Response
 
 TODO
+
+### 3.8 Instruction `unblockPIN`
+
+#### Description
+
+This function unblocks a PIN number using the unblock code specified in the DATA portion. The `LC` byte specifies the unblock code length. 
+
+**INS**: `0x46`
+
+**P1**: PIN number `0x00`-`0x07` (NOTE: if there is no PIN at the specified number the card will return `SW_INCORRECT_P1`)
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name  | description                                                  | length (bytes) | default value                          |
+| ----- | ------------------------------------------------------------ | -------------- | -------------------------------------- |
+| `PUK` | The unblock code in byte array format. For a unblock code of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30, 0x30, 0x30}` |
+
+#### Request Examples
+
+This example unblocks the PIN 0 using unblock code `000000`.
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x46, 0x00, 0x00, 0x06,
+   0x30, 0x30, 0x30, 0x30, 0x30, 0x30, // PUK
+}
+```
+
+#### Response
+
+TODO
