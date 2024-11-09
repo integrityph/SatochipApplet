@@ -369,3 +369,41 @@ This example requests a list of all available PINs
 
 TODO
 
+### 3.10 Instruction `getStatus`
+
+#### Description
+
+This function retrieves general information about the Applet running on the smart card, and useful information about the status of current session such as:
+
+- `protocolVersion` (2 bytes): `{PROTOCOL_MAJOR_VERSION, PROTOCOL_MINOR_VERSION}`
+- `appletVersion` (2 bytes): `{APPLET_MAJOR_VERSION, APPLET_MINOR_VERSION}`
+- `pinRemainingTries0` (1 byte)
+- `ublkRemainingTries0` (1 byte)
+- `pinRemainingTries1` (1 byte)
+- `ublkRemainingTries1` (1 byte)
+- `needs2FA` (1 byte): `0x00` for false or `0x01` for true
+- `is_seeded` (1 byte): check if BIP32 was seeded and returns `0x00` for false or `0x01` for true
+- `setupDone` (1 byte): `0x00` for false or `0x01` for true
+- `needs_secure_channel` (1 byte): `0x00` for false or `0x01` for true
+
+**INS**: `0x3C`
+
+**P1**: `0x00`
+
+**P2**: `0x00`
+
+**CDATA**: None
+
+#### Request Examples
+
+This example requests the status of a card
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x3c, 0x00, 0x00, 0x00
+}
+```
+
+#### Response
+
+TODO
