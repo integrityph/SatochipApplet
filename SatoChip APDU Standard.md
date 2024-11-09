@@ -198,3 +198,40 @@ This function returns the public key associated with a particular private key st
 #### Response
 
 TODO
+
+### 3.5 Instruction `createPIN`
+
+#### Description
+
+This function creates a PIN with parameters specified by the P1, P2 and DATA values. P2 specifies the maximum number of consecutive unsuccessful verifications before the PIN blocks. PIN can be created only if one of the logged identities allows it.
+
+**INS**: `0x40`
+
+**P1**: PIN number `0x00`-`0x07` (NOTE: if there is a PIN already at the specified number the card will return `SW_INCORRECT_P1`)
+
+**P2**: max attempt number `0x01`-`0x7f` (1-127)
+
+**CDATA**:
+
+| name        | description                                                  | length (bytes) | default value                          |
+| ----------- | ------------------------------------------------------------ | -------------- | -------------------------------------- |
+| `PIN_size`  | length of `PIN`                                              | 1              | `0x04`                                 |
+| `PIN`       | The desired pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}`             |
+| `UBLK_size` | length of `UBLK`                                             | 1              | `0x06`                                 |
+| `UBLK`      | The desired unblock code for the newly created PIN in byte array format. For a an unlock code of of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30, 0x30, 0x30}` |
+
+#### Request Examples
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x40, 0x00, 0x00, 0x0c,
+   0x04, // PIN_size
+   0x30, 0x30, 0x30, 0x30, // PIN
+   0x06, // UBLK_size
+   0x30, 0x30, 0x30, 0x30, 0x30, 0x30 // UBLK_size
+}
+```
+
+#### Response
+
+TODO
