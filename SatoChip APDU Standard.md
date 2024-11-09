@@ -386,7 +386,7 @@ This function retrieves general information about the Applet running on the smar
 - `setupDone` (1 byte): `0x00` for false or `0x01` for true
 - `needs_secure_channel` (1 byte): `0x00` for false or `0x01` for true
 
-**INS**: `0x3C`
+**INS**: `0x3c`
 
 **P1**: `0x00`
 
@@ -401,6 +401,42 @@ This example requests the status of a card
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
 {  0xb0, 0x3c, 0x00, 0x00, 0x00
+}
+```
+
+#### Response
+
+TODO
+
+### 3.11 Instruction `cardLabel`
+
+#### Description
+
+This function allows to define or recover a short description of the card.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` error.
+
+**INS**: `0x3d`
+
+**P1**: `0x00`
+
+**P2**: operation (`0x00` to set label, `0x01` to get label)
+
+**CDATA**:
+
+| name                                     | description                                                  | length (bytes) | default value |
+| ---------------------------------------- | ------------------------------------------------------------ | -------------- | ------------- |
+| `label_size` [required for  `P2`=`0x00`] | length of `label`                                            | 1              | NA            |
+| `label` [required for  `P2`=`0x00`]      | short description of the card to be used as a label. Can be useful to distinguish different cards. This is formatted as a byte array. | var            | NA            |
+
+#### Request Examples
+
+This example unblocks the PIN 0 using unblock code `000000`.
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x3d, 0x00, 0x00, 0x06,
+   0x30, 0x30, 0x30, 0x30, 0x30, 0x30, // PUK
 }
 ```
 
