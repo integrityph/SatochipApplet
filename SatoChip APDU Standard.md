@@ -721,3 +721,42 @@ This example is a request to parse the following transaction which is of length 
 
 TODO
 
+### 3.21 Instruction `signTransaction`
+
+#### Description
+
+This function signs the current hash transaction with a std or the last extended key. The hash provided in the APDU is compared to the version stored inside the chip. Depending of the total amount in the transaction and the predefined limit, a HMAC must be provided as an additional security layer.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**INS**: `0x6f`
+
+**P1**: key number or 0xFF for the last derived Bip32 extended key
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name      | description                                                  | length (bytes) | default value |
+| --------- | ------------------------------------------------------------ | -------------- | ------------- |
+| `tx_hash` | the hash of the transaction as calculated or received from `parseTransaction` | 32             | NA            |
+
+#### Request Examples
+
+This example is a request sign a transaction with the lastest derived BIP32 key. The transaction was preciously parsed using `parseTransaction` with the transaction hash `a637ad18fabee7ad3ccd51e317091a6e16991311c0c9b83233b140b66b114448`
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x6f, 0x00, 0x00, 0x20,
+   0xa6, 0x37, 0xad, 0x18, 0xfa, 0xbe, 0xe7, //
+   0xad, 0x3c, 0xcd, 0x51, 0xe3, 0x17, 0x09, //
+   0x1a, 0x6e, 0x16, 0x99, 0x13, 0x11, 0xc0, //
+   0xc9, 0xb8, 0x32, 0x33, 0xb1, 0x40, 0xb6, // 
+   0x6b, 0x11, 0x44, 0x48                    // tx_hash
+}
+```
+
+#### Response
+
+TODO
+
