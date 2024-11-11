@@ -518,3 +518,41 @@ This example resets the BIP32 seed on the card
 
 TODO
 
+### 3.14 Instruction `getBIP32AuthentiKey`
+
+#### Description
+
+This function returns the authentikey public key (uniquely derived from the Bip32 seed). The function returns the x-coordinate of the authentikey, self-signed. The authentikey full public key can be recovered from the signature.
+
+**NOTE**: It doesn't seem like authentikey is actually "uniquely derived from the Bip32 seed". This has to be tested separately by getting the key using INS `getAuthentiKey` then import a BIP32 key then get the key again using this instruction and compare the two results. If the results are the same, then the authentikey is not "uniquely derived from the Bip32 seed" but just randomly generated during installation.
+
+**Note**: If the card has already been seeded with BIP32, you will get back an error `SW_BIP32_INITIALIZED_SEED` (`0x9c17`)
+
+**INS**: `0x73`
+
+**P1**: PIN_size (1 byte). This value should indicate the length of `PIN` in CDATA.
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name                       | description                                                  | length (bytes) | default value              |
+| -------------------------- | ------------------------------------------------------------ | -------------- | -------------------------- |
+| `PIN`                      | The pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
+| `optional-hmac` [optional] | 20 bytes HMAC key for 2FA.                                   | 20             | NA                         |
+
+#### Request Examples
+
+This example resets the BIP32 seed on the card
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x77, 0x00, 0x00, 0x04,
+   0x30, 0x30, 0x30, 0x30 // PIN
+}
+```
+
+#### Response
+
+TODO
+
