@@ -606,7 +606,7 @@ The function computes the Bip32 extended key derived from the master key and ret
 
 | name         | description                                                  | length (bytes) | default value |
 | ------------ | ------------------------------------------------------------ | -------------- | ------------- |
-| `index_path` | `index_path` from master to extended key (m/i/j/k/...). 4 bytes per index. For example, to get a BIP44 extended key for `m / 44' / 0' / 0' / 0 / 0` the value would consist of the following byte blocks:<br /> - `0x8000002c` where `0x80000000` denotes the single bit for a hardened key and `0x0000002c` is 44 in hex.<br /> - `0x80000000`<br /> - `0x80000000`<br /> - `0x00000000`<br /> - `0x00000000`<br />So, once all these byte blocks are concatenated this value would be `0x8000002c80000000800000000000000000000000` | var            | NA            |
+| `index_path` | `index_path` from master to extended key (m/i/j/k/...). 4 bytes per index. For example, to get a BIP44 extended key for `M / 44' / 0' / 0' / 0 / 0` the value would consist of the following byte blocks:<br /> - `0x8000002c` where `0x80000000` denotes the single bit for a hardened key and `0x0000002c` is 44 in hex.<br /> - `0x80000000`<br /> - `0x80000000`<br /> - `0x00000000`<br /> - `0x00000000`<br />So, once all these byte blocks are concatenated this value would be `0x8000002c80000000800000000000000000000000` | var            | NA            |
 
 #### Request Examples
 
