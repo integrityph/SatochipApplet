@@ -526,29 +526,23 @@ This function returns the authentikey public key (uniquely derived from the Bip3
 
 **NOTE**: It doesn't seem like authentikey is actually "uniquely derived from the Bip32 seed". This has to be tested separately by getting the key using INS `getAuthentiKey` then import a BIP32 key then get the key again using this instruction and compare the two results. If the results are the same, then the authentikey is not "uniquely derived from the Bip32 seed" but just randomly generated during installation.
 
-**Note**: If the card has already been seeded with BIP32, you will get back an error `SW_BIP32_INITIALIZED_SEED` (`0x9c17`)
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
 
 **INS**: `0x73`
 
-**P1**: PIN_size (1 byte). This value should indicate the length of `PIN` in CDATA.
+**P1**: `0x00`
 
 **P2**: `0x00`
 
-**CDATA**:
-
-| name                       | description                                                  | length (bytes) | default value              |
-| -------------------------- | ------------------------------------------------------------ | -------------- | -------------------------- |
-| `PIN`                      | The pin in byte array format. For a PIN of `0000` you should use `{0x30, 0x30, 0x30, 0x30}` | var            | `{0x30, 0x30, 0x30, 0x30}` |
-| `optional-hmac` [optional] | 20 bytes HMAC key for 2FA.                                   | 20             | NA                         |
+**CDATA**: None
 
 #### Request Examples
 
-This example resets the BIP32 seed on the card
+This example requests the authntikey public key and it's signature.
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
-{  0xb0, 0x77, 0x00, 0x00, 0x04,
-   0x30, 0x30, 0x30, 0x30 // PIN
+{  0xb0, 0x73, 0x00, 0x00, 0x00
 }
 ```
 
@@ -556,3 +550,34 @@ This example resets the BIP32 seed on the card
 
 TODO
 
+### 3.15 Instruction `getAuthentiKey`
+
+#### Description
+
+This function returns the authentikey public key. The function returns the x-coordinate of the authentikey, self-signed. The authentikey full public key can be recovered from the signature.
+
+Compared to `getBIP32AuthentiKey`, this method returns the Authentikey even if the card is not seeded. For SeedKeeper encrypted seed import, we use the authentikey as a Trusted Pubkey for the ECDH key exchange, thus the authentikey must be available before the Satochip is seeded. Before a seed is available, the authentiey is generated oncard randomly in the constructor.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**INS**: `0xad`
+
+**P1**: `0x00`
+
+**P2**: `0x00`
+
+**CDATA**: None
+
+#### Request Examples
+
+This example requests the authntikey public key and it's signature.
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0xad, 0x00, 0x00, 0x00
+}
+```
+
+#### Response
+
+TODO
