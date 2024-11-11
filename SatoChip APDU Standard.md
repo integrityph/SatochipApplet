@@ -606,11 +606,11 @@ The function computes the Bip32 extended key derived from the master key and ret
 
 | name         | description                                                  | length (bytes) | default value |
 | ------------ | ------------------------------------------------------------ | -------------- | ------------- |
-| `index_path` | `index_path` from master to extended key (m/i/j/k/...). 4 bytes per index. For example, to get a BIP44 extended key for `M / 44' / 0' / 0' / 0 / 0` the value would consist of the following byte blocks:<br /> - `0x8000002c` where `0x80000000` denotes the single bit for a hardened key and `0x0000002c` is 44 in hex.<br /> - `0x80000000`<br /> - `0x80000000`<br /> - `0x00000000`<br /> - `0x00000000`<br />So, once all these byte blocks are concatenated this value would be `0x8000002c80000000800000000000000000000000` | var            | NA            |
+| `index_path` | `index_path` from master to extended key (m/i/j/k/...). 4 bytes per index. For example, to get a BIP44 extended key for `M / 44' / 0' / 0' / 0 / 0` the value would consist of the following byte blocks:<br /> - `0x8000002c` where `0x80000000` denotes the single bit for a hardened key and `0x0000002c` is 44 in hex.<br /> - `0x80000000`<br /> - `0x80000000`<br /> - `0x00000000`<br /> - `0x00000000`<br />concatenated these byte blocks gives this: `0x8000002c80000000800000000000000000000000` | var            | NA            |
 
 #### Request Examples
 
-This example resets the BIP32 seed on the card
+This example requests the extended public key for HD wallet path `M / 44' / 0' / 0' / 0 / 0`
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
@@ -618,6 +618,62 @@ This example resets the BIP32 seed on the card
    0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x00, // ==========
    0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, // index_path
    0x00, 0x00, 0x00, 0x00, 0x00, 0x00        // ==========
+}
+```
+
+#### Response
+
+TODO
+
+### 3.18 Instruction `setBIP32ExtendedPubkey` [DEPRECATED]
+
+There is no actual implementation in the applet for this instruction.
+
+### 3.19 Instruction `signMessage`
+
+#### Description
+
+This function signs Bitcoin message using std or Bip32 extended key
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**Note**: If the card has not already been seeded with BIP32, you will get back an error `SW_BIP32_UNINITIALIZED_SEED` (`0x9C14`).
+
+**INS**: `0x6e`
+
+**P1**: key number or 0xFF for the last derived Bip32 extended key
+
+**P2**: acceptable values are `0x01`=`Init`, `0x02`=`Update`,  `0x03`=`Finalize`. To actually sign a message, `Init` process has to be performed and to receive the result, a `Finalize` process has to be performed. `Update` process is only required is the message to too long to fit into a single APDU request.
+
+**Note**: If an `Update` or a `Finalize` process was performed before `Init` process, the card will return an error `SW_INCORRECT_INITIALIZATION` (`0x9C13`)
+
+**CDATA**:
+
+| name                                       | description                                                  | length (bytes) | default value |
+| ------------------------------------------ | ------------------------------------------------------------ | -------------- | ------------- |
+| `full_msg_size` (`Init` process)           | the full size of the message to be signed as a `signed int16` encoded as `BIG ENDIAN` byte array | 4              | NA            |
+| `altcoinSize` (`Init` process) [optional]  | The size on `altcoin`                                        | 1              | NA            |
+| `altcoin` (`Init` process) [optional]      | Optional byte array for the alt coin                         | var            | NA            |
+| `chunk_size` (`Update`/`Finalize` process) | the size of `chunk_data`                                     | 2              | NA            |
+| `chunk_data` (`Update`/`Finalize` process) | a byte array containing the message to be signed.            | var            | NA            |
+| `HMAC-2FA` (`Finalize` process) [optional] | 20 bytes HMAC key for 2FA.                                   | 20             | NA            |
+
+#### Request Examples
+
+This example signs a message `hello world` using latest derived key using two requests to perform `Init` then `Finalize` processes.
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x6e, 0xff, 0x01, 0x04,
+   0x00, 0x00, 0x00, 0x0b // full_msg_size
+}
+```
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x6e, 0xff, 0x03, 0x0c,
+   0x0b, // chunk_size
+   0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64 // chunk_data
 }
 ```
 
