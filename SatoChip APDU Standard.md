@@ -680,3 +680,44 @@ This example signs a message `hello world` using latest derived key using two re
 #### Response
 
 TODO
+
+### 3.20 Instruction `parseTransaction`
+
+#### Description
+
+This function parses a raw transaction and returns the corresponding double SHA-256. If the Bip32 seed is initialized, the hash is signed with the authentikey.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**INS**: `0x71`
+
+**P1**: `Init` = `0x01` or `Process`=`0x02`
+
+**P2**: `PARSE_STD` = `0x00` or `PARSE_SEGWIT` = `0x01`
+
+**CDATA**:
+
+| name     | description                                | length (bytes) | default value |
+| -------- | ------------------------------------------ | -------------- | ------------- |
+| `raw_tx` | byte array of the transaction to be parsed | var            | NA            |
+
+#### Request Examples
+
+This example is a request to parse the following transaction which is of length 226 (`0xe2`). Since this transaction is not longer than 255 bytes, `P1` for this request is `Init` (or `0x01`).
+
+```
+020000000180b98c54dbab5106d5a1449f4e5fdb9146deca1d48e93d666c5d9290b7c37a3f010000006b483045022100f0e32ceb205a5056694611afcffe4c1f0e63e9c57382607045ff2c3d9b5b7b3f0220111f0323e56d7462a9299833166569f1a68e1f5090b49bea64f541c494109c6c012102d0648f06a31d47112f1ff7848c85ce54b772c513bc3337c98f081c19d3dca260ffffffff02006d7c4d000000001976a91474d463a046e3175142464740bad692fa0762a93e88accad5e5f1b50000001976a914c98fc6bd9c2fd88533f28e6797cfa2a0a0e18ecf88ac00000000
+```
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x71, 0x00, 0x00, 0xe2,
+   0x02, 0x00, 0x00, 0x00, 0x01, //
+   0x80, 0xb9, 0x8c ...          // raw_tx
+}
+```
+
+#### Response
+
+TODO
+
