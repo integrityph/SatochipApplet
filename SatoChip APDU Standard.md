@@ -581,3 +581,46 @@ This example requests the authntikey public key and it's signature.
 #### Response
 
 TODO
+
+### 3.16 Instruction `setBIP32AuthentikeyPubkey` [DEPRECATED]
+
+There is no actual implementation in the applet for this instruction.
+
+### 3.17 Instruction `getBIP32ExtendedKey`
+
+#### Description
+
+The function computes the Bip32 extended key derived from the master key and returns the x-coordinate of the public key signed by the authentikey. Extended key is stored in the chip in a temporary EC key, along with corresponding ACL. Extended key and chaincode is also cached as a Bip32 object in secure memory.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**Note**: If the card has not already been seeded with BIP32, you will get back an error `SW_BIP32_UNINITIALIZED_SEED` (`0x9C14`)
+
+**INS**: `0x6d`
+
+**P1**: depth of the extended key (master is depth 0, m/i is depht 1). Max depth is 10
+
+**P2**: 8 flags for different options during this operation. Currently the only option implemented is (`0x80` or `0b1000 0000`) which resets all stored BIP32 stored keys before derive the new key.
+
+**CDATA**:
+
+| name         | description                                                  | length (bytes) | default value |
+| ------------ | ------------------------------------------------------------ | -------------- | ------------- |
+| `index_path` | `index_path` from master to extended key (m/i/j/k/...). 4 bytes per index. For example, to get a BIP44 extended key for `m / 44' / 0' / 0' / 0 / 0` the value would consist of the following byte blocks:<br /> - `0x8000002c` where `0x80000000` denotes the single bit for a hardened key and `0x0000002c` is 44 in hex.<br /> - `0x80000000`<br /> - `0x80000000`<br /> - `0x00000000`<br /> - `0x00000000`<br />So, once all these byte blocks are concatenated this value would be `0x8000002c80000000800000000000000000000000` | var            | NA            |
+
+#### Request Examples
+
+This example resets the BIP32 seed on the card
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x6d, 0x00, 0x00, 0x14,
+   0x80, 0x00, 0x00, 0x2c, 0x80, 0x00, 0x00, // ==========
+   0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, // index_path
+   0x00, 0x00, 0x00, 0x00, 0x00, 0x00        // ==========
+}
+```
+
+#### Response
+
+TODO
