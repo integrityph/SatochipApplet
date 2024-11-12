@@ -73,7 +73,7 @@ This instruction is supposed to be used one during the initialization of the car
 | `RFU`                     | Reserved for future use                                      | 3              | `{0x00, 0x00, 0x00}`                                |
 | `option_flags` [optional] | 2 bytes of bit flags (16 flags) for additional features. This is the list of features and their values:<br /> - `HMAC_CHALRESP_2FA` (`0x8000`): enables 2-factor authentication (2FA) using hmac-sha1 challenge-response. To enable this feature, set the corresponding bit value to 1 which makes the value `0bxxxx1xxx, 0bxxxxxxxx ` where `x` can be `0` or `1` depending of the need to enable other additional features. | 2              | `{0x00, 0x00}`                                      |
 | `hmacsha1_key` [optional] | HMAC key used for transaction authorization when 2FA is enabled. | 20             | NA                                                  |
-| `amount_limit` [optional] | Max amount (in satoshis) allowed without confirmation (this includes change value) when 2FA is enabled. This value is is a `uint64` encoded in 8 bytes in `BIG ENDIAN` or `LITTLE ENDIAN`? | 8              | NA                                                  |
+| `amount_limit` [optional] | Max amount (in satoshis) allowed without confirmation (this includes change value) when 2FA is enabled. This value is is a `uint64` encoded in 8 bytes in `BIG ENDIAN` or `LITTLE ENDIAN`?<br /><br />**Note**: It seems there is a bug in the implementation for checking the amount. The amount in the transaction is encoded as `LITTLE ENDIAN` but he `BigInteger.lessThan` function used uses `BIG_ENDIAN` which makes this feature impossible to use. | 8              | NA                                                  |
 
 #### Request Examples
 
@@ -768,6 +768,8 @@ This function signs a given transaction hash with a std or the last extended key
 
 **Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
 
+**Note**: When using this instruction, the limit for the maximum amount without 2FA verification is ignored and you have to always do the 2FA verification.
+
 **INS**: `0x7a`
 
 **P1**: key number or `0xff` for the last derived Bip32 extended key
@@ -785,6 +787,48 @@ This function signs a given transaction hash with a std or the last extended key
 #### Request Examples
 
 This example is a request sign a transaction with the latest derived BIP32 key. The transaction has was computed externally and it is: `a637ad18fabee7ad3ccd51e317091a6e16991311c0c9b83233b140b66b114448`
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x7a, 0x00, 0x00, 0x20,
+   0xa6, 0x37, 0xad, 0x18, 0xfa, 0xbe, 0xe7, //
+   0xad, 0x3c, 0xcd, 0x51, 0xe3, 0x17, 0x09, //
+   0x1a, 0x6e, 0x16, 0x99, 0x13, 0x11, 0xc0, //
+   0xc9, 0xb8, 0x32, 0x33, 0xb1, 0x40, 0xb6, // 
+   0x6b, 0x11, 0x44, 0x48                    // tx_hash
+}
+```
+
+#### Response
+
+TODO
+
+### 3.23 Instruction `set2FAKey`
+
+#### Description
+
+This function allows to set the 2FA key and enable 2FA. Once activated, 2FA can only be deactivated when the seed is reset.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**Note**: If 2FA is already enabled on the card, you will get an error `SW_2FA_INITIALIZED_KEY` (`0x9C18`)
+
+**INS**: `0x79`
+
+**P1**: `0x00`
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name           | description                                                  | length (bytes) | default value |
+| -------------- | ------------------------------------------------------------ | -------------- | ------------- |
+| `hmacsha1_key` | 20 bytes HMAC key for 2FA.                                   | 32             | NA            |
+| `amount_limit` | Max amount (in satoshis) allowed without confirmation (this includes change value) when 2FA is enabled. This value is is a `uint64` encoded in 8 bytes in `BIG ENDIAN` or `LITTLE ENDIAN`?<br /><br />**Note**: It seems there is a bug in the implementation for checking the amount. The amount in the transaction is encoded as `LITTLE ENDIAN` but he `BigInteger.lessThan` function used uses `BIG_ENDIAN` which makes this feature impossible to use. | 2              | `0x0000`      |
+
+#### Request Examples
+
+
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
