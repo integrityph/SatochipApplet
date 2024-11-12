@@ -821,23 +821,23 @@ This function allows to set the 2FA key and enable 2FA. Once activated, 2FA can 
 
 **CDATA**:
 
-| name           | description                                                  | length (bytes) | default value |
-| -------------- | ------------------------------------------------------------ | -------------- | ------------- |
-| `hmacsha1_key` | 20 bytes HMAC key for 2FA.                                   | 32             | NA            |
-| `amount_limit` | Max amount (in satoshis) allowed without confirmation (this includes change value) when 2FA is enabled. This value is is a `uint64` encoded in 8 bytes in `BIG ENDIAN` or `LITTLE ENDIAN`?<br /><br />**Note**: It seems there is a bug in the implementation for checking the amount. The amount in the transaction is encoded as `LITTLE ENDIAN` but he `BigInteger.lessThan` function used uses `BIG_ENDIAN` which makes this feature impossible to use. | 2              | `0x0000`      |
+| name           | description                                                  | length (bytes) | default value        |
+| -------------- | ------------------------------------------------------------ | -------------- | -------------------- |
+| `hmacsha1_key` | 20 bytes HMAC key for 2FA.                                   | 32             | NA                   |
+| `amount_limit` | Max amount (in satoshis) allowed without confirmation (this includes change value) when 2FA is enabled. This value is is a `uint64` encoded in 8 bytes in `BIG ENDIAN` or `LITTLE ENDIAN`?<br /><br />**Note**: It seems there is a bug in the implementation for checking the amount. The amount in the transaction is encoded as `LITTLE ENDIAN` but he `BigInteger.lessThan` function used uses `BIG_ENDIAN` which makes this feature impossible to use. | 2              | `0x0000000000000000` |
 
 #### Request Examples
 
-
+This example send a request to set 2FA and set the amount limit to 0 where all transactions will require 2FA authentication.
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
-{  0xb0, 0x7a, 0x00, 0x00, 0x20,
+{  0xb0, 0x79, 0x00, 0x00, 0x14,
    0xa6, 0x37, 0xad, 0x18, 0xfa, 0xbe, 0xe7, //
    0xad, 0x3c, 0xcd, 0x51, 0xe3, 0x17, 0x09, //
-   0x1a, 0x6e, 0x16, 0x99, 0x13, 0x11, 0xc0, //
-   0xc9, 0xb8, 0x32, 0x33, 0xb1, 0x40, 0xb6, // 
-   0x6b, 0x11, 0x44, 0x48                    // tx_hash
+   0x1a, 0x6e, 0x16, 0x99, 0x13, 0x11,       // hmacsha1_key
+   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
+   0x00                                      // amount_limit
 }
 ```
 
