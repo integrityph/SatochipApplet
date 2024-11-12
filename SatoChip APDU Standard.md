@@ -731,7 +731,7 @@ This function signs the current hash transaction with a std or the last extended
 
 **INS**: `0x6f`
 
-**P1**: key number or 0xFF for the last derived Bip32 extended key
+**P1**: key number or `0xff` for the last derived Bip32 extended key
 
 **P2**: `0x00`
 
@@ -743,7 +743,7 @@ This function signs the current hash transaction with a std or the last extended
 
 #### Request Examples
 
-This example is a request sign a transaction with the lastest derived BIP32 key. The transaction was preciously parsed using `parseTransaction` with the transaction hash `a637ad18fabee7ad3ccd51e317091a6e16991311c0c9b83233b140b66b114448`
+This example is a request sign a transaction with the latest derived BIP32 key. The transaction was preciously parsed using `parseTransaction` with the transaction hash `a637ad18fabee7ad3ccd51e317091a6e16991311c0c9b83233b140b66b114448`
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
@@ -760,3 +760,43 @@ This example is a request sign a transaction with the lastest derived BIP32 key.
 
 TODO
 
+### 3.22 Instruction `signTransactionHash`
+
+#### Description
+
+This function signs a given transaction hash with a std or the last extended key. If 2FA is enabled, a HMAC must be provided as an additional security layer. 
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**INS**: `0x7a`
+
+**P1**: key number or `0xff` for the last derived Bip32 extended key
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name                                    | description                                                  | length (bytes) | default value |
+| --------------------------------------- | ------------------------------------------------------------ | -------------- | ------------- |
+| `tx_hash`                               | pre-computed hash of a transaction to be signed as a byte array | 32             | NA            |
+| `2FA-flag` [required of 2FA is enabled] | If 2FA is enabled, this flag has to have this flag set `0x8000` or the card will return an error `SW_INCORRECT_ALG` (`0x9c09`) | 2              | `0x0000`      |
+| `hmac` [required of 2FA is enabled]     | 20 bytes HMAC key for 2FA.                                   | 20             | NA            |
+
+#### Request Examples
+
+This example is a request sign a transaction with the latest derived BIP32 key. The transaction has was computed externally and it is: `a637ad18fabee7ad3ccd51e317091a6e16991311c0c9b83233b140b66b114448`
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x7a, 0x00, 0x00, 0x20,
+   0xa6, 0x37, 0xad, 0x18, 0xfa, 0xbe, 0xe7, //
+   0xad, 0x3c, 0xcd, 0x51, 0xe3, 0x17, 0x09, //
+   0x1a, 0x6e, 0x16, 0x99, 0x13, 0x11, 0xc0, //
+   0xc9, 0xb8, 0x32, 0x33, 0xb1, 0x40, 0xb6, // 
+   0x6b, 0x11, 0x44, 0x48                    // tx_hash
+}
+```
+
+#### Response
+
+TODO
