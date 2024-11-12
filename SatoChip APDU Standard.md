@@ -883,3 +883,47 @@ This example send a request to set 2FA and set the amount limit to 0 where all t
 #### Response
 
 TODO
+
+### 3.25 Instruction `cryptTransaction2FA` [Not Required]
+
+### 3.26 Instruction `importTrustedPubkey` [Not Required]
+
+### 3.27 Instruction `exportTrustedPubkey` [Not Required]
+
+### 3.28 Instruction `importBIP32EncryptedSeed` [DEPRECATED]
+
+### 3.29 Instruction `importEncryptedSecret` [Not Required]
+
+### 3.30 Instruction `initiateSecureChannel` [Not Required]
+
+### 3.31 Instruction `processSecureChannel` [Not Required]
+
+### 3.32 Instruction `exportPKIPubkey`
+
+#### Description
+
+This function export the ECDSA secp256k1 public key that corresponds to the private key for authentikey.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**INS**: `0x98`
+
+**P1**: `0x00`
+
+**P2**: `0x00`
+
+**CDATA**: None
+
+#### Request Examples
+
+This example sends a request to get the public key of authentikey.
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x98, 0x00, 0x00, 0x00
+}
+```
+
+#### Response
+
+TODO
