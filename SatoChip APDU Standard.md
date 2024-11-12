@@ -14,9 +14,9 @@ In APDU communication, a packet is sent to a Java Card applet which processes th
 
 The request consists of a header and a body. The request is formatted at follows:
 
-| CLA    | INS    | P1     | P2     | LC                | CDATA          | LE                |
-| ------ | ------ | ------ | ------ | ----------------- | -------------- | ----------------- |
-| 1 byte | 1 byte | 1 byte | 1 byte | 1 byte [optional] | var [optional] | 1 byte [optional] |
+| CLA    | INS    | P1     | P2     | $\text{L}_{\text{c}}$     | CDATA          | $\text{L}_{\text{e}}$     |
+| ------ | ------ | ------ | ------ | ------------------------- | -------------- | ------------------------- |
+| 1 byte | 1 byte | 1 byte | 1 byte | 0, 1 or 3 byte [optional] | var [optional] | 0, 1 or 3 byte [optional] |
 
 **CLA**: The class of which is used to distinguish different products and products classes. For SatoChip, this value is always `0xb0`.
 
@@ -24,19 +24,83 @@ The request consists of a header and a body. The request is formatted at follows
 
 **P1, P2**: parameter 1 and parameter 2 are two values to be passed to the Java Card with the request. For possible values, check the instruction documentation below.
 
-**LC**: The length of `CDATA`. Can be omitted if the value is `0x00`.
+**Lc**: The length of `CDATA`. Can be omitted if the value is `0x00`. The length of this variable can be:
+
+- 0 for no CDATA. 
+- 1 for CDATA length between 1 and 255
+- 3 for CDATA length between 256 and 65535 where the first byte value is always 0 and the next two bytes encode the rest of the integer in `BIT ENDIAN`
 
 **CDATA**: is an array of bytes of length of 1 to 255.
 
-**LE**: explicit length of response. This can be omitted or sat to value `0x00` if there is no expected response of when the length of the response is unknown.
+**Le**: explicit length of response. This can be omitted or sat to value `0x00`. The length of this variable can be:
+
+- 0 for no response. 
+- 1 for response length between 1 and 255
+- 3 for response length between 256 and 65535 where the first byte value is always 0 and the next two bytes encode the rest of the integer in `BIT ENDIAN`
 
 ### 2.2 Response Format
 
+| Response data field | SW1-SW2 |
+| ------------------- | ------- |
+| var [optional]      | 2 bytes |
 
+**Response data field**: A byte string response from the card.
+
+**SW1-SW2**: Status bytes.
+
+Only valid values for SW1-SW2 are: `0x6XXX` and `0x9XXX` except for `0x60XX` which is invalid.
+
+There are two categories of SW1-SW2 values:
+
+- interindustry: have standard use can can be used by multiple applets
+- proprietary: restricted use specified in ISO/IEC 7816-3
+
+| SW1-SW2 | Category      | Comments              |
+| ------- | ------------- | --------------------- |
+| 61XX    | interindustry |                       |
+| 62XX    | interindustry |                       |
+| 63XX    | interindustry |                       |
+| 63XX    | interindustry |                       |
+| 64XX    | interindustry |                       |
+| 65XX    | interindustry |                       |
+| 66XX    | interindustry |                       |
+| 67XX    | proprietary   | 6700 is interindustry |
+| 68XX    | interindustry |                       |
+| 69XX    | interindustry |                       |
+| 6AXX    | interindustry |                       |
+| 6BXX    | proprietary   | 6B00 is interindustry |
+| 6CXX    | interindustry |                       |
+| 6DXX    | proprietary   | 6D00 is interindustry |
+| 6EXX    | proprietary   | 6E00 is interindustry |
+| 6FXX    | proprietary   | 6F00 is interindustry |
+| 9XXX    | proprietary   | 9000 is interindustry |
+
+Some well, known interindustry status bytes include:
+
+- Normal processing
+  - `0x9000`: No further qualification
+  - `0x61XX`: SW2 encodes the number of data bytes still available
+- Warning processing
+  - `0x62XX`: State of non-volatile memory is unchanged (further qualification in SW2)
+  - `0x63XX`: State of non-volatile memory has changed (further qualification in SW2)
+- Execution error
+  - `0x64XX`: State of non-volatile memory is unchanged (further qualification in SW2)
+  - `0x65XX`: State of non-volatile memory has changed (further qualification in SW2)
+  - `0x66XX`: Security-related issues
+- Checking error
+  - `0x6700`: Wrong length; no further indication
+  - `0x68XX`: Functions in CLA not supported (further qualification in SW2)
+  - `0x69XX`: Command not allowed (further qualification in SW2)
+  - `0x6aXX`: Wrong parameters P1-P2 (further qualification in SW2)
+  - `0x6b00`: Wrong parameters P1-P2
+  - `0x6cXX`: Wrong Le field; SW2 encodes the exact number of available data bytes
+  - `0x6d00`: Instruction code not supported or invalid
+  - `0x6e00`: Class not supported 
+  - `0x6f00`: No precise diagnosis
+
+**NOTE**: If the process is aborted with a value of SW1 from '64' to '6F', then the response data field shall be absent.
 
 ## 3. APDU Instructions
-
-
 
 ### 3.1 Instruction `setup`
 
