@@ -844,3 +844,42 @@ This example send a request to set 2FA and set the amount limit to 0 where all t
 #### Response
 
 TODO
+
+### 3.24 Instruction `reset2FAKey`
+
+#### Description
+
+This function allows to reset the 2FA key and disable 2FA. Once activated, 2FA can only be deactivated when the seed is reset and all eckeys cleared.
+
+**Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
+
+**Note**: If 2FA is not already enabled on the card, you will get an error `SW_2FA_UNINITIALIZED_KEY` (`0x9C19`)
+
+**INS**: `0x78`
+
+**P1**: `0x00`
+
+**P2**: `0x00`
+
+**CDATA**:
+
+| name           | description                | length (bytes) | default value |
+| -------------- | -------------------------- | -------------- | ------------- |
+| `hmacsha1_key` | 20 bytes HMAC key for 2FA. | 32             | NA            |
+
+#### Request Examples
+
+This example send a request to set 2FA and set the amount limit to 0 where all transactions will require 2FA authentication.
+
+```c++
+// CLA   INS   P1    P2    LC    CDATA ...
+{  0xb0, 0x78, 0x00, 0x00, 0x14,
+   0xa6, 0x37, 0xad, 0x18, 0xfa, 0xbe, 0xe7, //
+   0xad, 0x3c, 0xcd, 0x51, 0xe3, 0x17, 0x09, //
+   0x1a, 0x6e, 0x16, 0x99, 0x13, 0x11        // hmacsha1_key
+}
+```
+
+#### Response
+
+TODO
