@@ -8,7 +8,7 @@ This document provides a complete list of APDU instructions used with SatoChip J
 
 ## 2. APDU Specifications
 
-In APDU communication, a packet is sent to a Java Card applet which processes the request and sends back a response. This is the communication protocol used to communicate with the card using the ISO7816 chip connection or NFC.
+In APDU communication, a psacket is sent to a Java Card applet which processes the request and sends back a response. This is the communication protocol used to communicate with the card using the ISO7816 chip connection or NFC.
 
 ### 2.1 Request Format
 
@@ -99,6 +99,8 @@ Some well, known interindustry status bytes include:
   - `0x6f00`: No precise diagnosis
 
 **NOTE**: If the process is aborted with a value of SW1 from '64' to '6F', then the response data field shall be absent.
+
+**Note**: If SW1 is set to '63' or '65', then the state of the non-volatile memory has changed. If SW1 is set to '6X' except for '63' and '65', then the state of the non-volatile memory is unchanged.
 
 ## 3. APDU Instructions
 
