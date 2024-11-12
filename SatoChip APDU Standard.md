@@ -764,7 +764,7 @@ TODO
 
 #### Description
 
-This function signs a given transaction hash with a std or the last extended key. If 2FA is enabled, a HMAC must be provided as an additional security layer. 
+This function signs a given transaction hash with a std or the last extended key. If 2FA is enabled, a HMAC must be provided as an additional security layer. This transaction hash is computed externally and is not verified by the card.
 
 **Note**:  PIN 0 has to be verified before this instruction in requested or the card will return `SW_UNAUTHORIZED` (`0x9c06`) error.
 
