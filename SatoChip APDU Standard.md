@@ -150,7 +150,7 @@ SW1-SW2 specific to this applet:
 
 This instruction is supposed to be used one during the initialization of the card.
 
-**INS**: `0xa1`
+**INS**: `0x2a`
 
 **P1**: `0x00`
 
@@ -194,6 +194,8 @@ This instruction is supposed to be used one during the initialization of the car
    0x30, 0x30, 0x30, 0x30, // pin0
    0x06, // ublk0_length
    0x30, 0x30, 0x30, 0x30, 0x30, 0x30, // ublk0
+   0x03, // pin_tries1
+   0x03, // ublk_tries1
    0x04, // pin1_length
    0x30, 0x31, 0x32, 0x33, // pin1
    0x06, // ublk1_length
@@ -205,9 +207,26 @@ This instruction is supposed to be used one during the initialization of the car
 }
 ```
 
+```bash
+$ gp -a b02a00002c084d7573636c65303003030430303030063030303030300303043031323306303132333435000a0000000000
+...
+A>> T=1 (4+0044) B02A0000 2C 084D7573636C65303003030430303030063030303030300303043031323306303132333435000A0000000000
+A<< (0000+2) (376ms) 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+	"statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
+
 #### Response
 
-**6E00**
+None
 
 ### 3.2 Instruction `importKey`
 
@@ -303,7 +322,7 @@ This function returns the public key associated with a particular private key st
 
 #### Response
 
-`6E00`
+TODO
 
 ### 3.5 Instruction `createPIN`
 
@@ -441,6 +460,10 @@ This example unblocks the PIN 0 using unblock code `000000`.
 }
 ```
 
+```bash
+$ gp -a b046000006303030303030 -d
+```
+
 #### Response
 
 TODO
@@ -528,8 +551,12 @@ This response can be parsed in JSON as:
     "ublkRemainingTries0": "00",
     "pinRemainingTries1": "00",
     "ublkRemainingTries1": "00",
-    "needs2FA" "00",
-    
+    "needs2FA": "00",
+    "is_seeded": "00",
+    "setupDone": "00",
+    "needs_secure_channel": "01",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
 }
 ```
 
@@ -537,15 +564,17 @@ This response can be parsed in JSON as:
 
 #### Response
 
-| name                  | description                                        | length (bytes) |
-| --------------------- | -------------------------------------------------- | -------------- |
-| `protocolVersion`     | `{PROTOCOL_MAJOR_VERSION, PROTOCOL_MINOR_VERSION}` | 2              |
-| `appletVersion`       | `{APPLET_MAJOR_VERSION, APPLET_MINOR_VERSION}`     | 2              |
-| `pinRemainingTries0`  | The remaining tries for `PIN0`                     | 1              |
-| `ublkRemainingTries0` | The remaining tries for `UBLK0`                    | 1              |
-| `pinRemainingTries1`  | The remaining tries for `PIN1`                     | 1              |
-| `ublkRemainingTries1` | The remaining tries for `UBLK1`                    | 1              |
-|                       |                                                    |                |
+| name                   | description                                                  | length (bytes) |
+| ---------------------- | ------------------------------------------------------------ | -------------- |
+| `protocolVersion`      | `{PROTOCOL_MAJOR_VERSION, PROTOCOL_MINOR_VERSION}`           | 2              |
+| `appletVersion`        | `{APPLET_MAJOR_VERSION, APPLET_MINOR_VERSION}`               | 2              |
+| `pinRemainingTries0`   | The remaining tries for `PIN0`                               | 1              |
+| `ublkRemainingTries0`  | The remaining tries for `UBLK0`                              | 1              |
+| `pinRemainingTries1`   | The remaining tries for `PIN1`                               | 1              |
+| `ublkRemainingTries1`  | The remaining tries for `UBLK1`                              | 1              |
+| `is_seeded`            | check if BIP32 was seeded and returns `0x00` for false or `0x01` for true | 1              |
+| `setupDone`            | `0x00` for false or `0x01` for true                          | 1              |
+| `needs_secure_channel` | `0x00` for false or `0x01` for true                          | 1              |
 
 
 
