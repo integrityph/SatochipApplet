@@ -207,7 +207,7 @@ This instruction is supposed to be used one during the initialization of the car
 
 #### Response
 
-TODO
+**6E00**
 
 ### 3.2 Instruction `importKey`
 
@@ -303,7 +303,7 @@ This function returns the public key associated with a particular private key st
 
 #### Response
 
-TODO
+`6E00`
 
 ### 3.5 Instruction `createPIN`
 
@@ -510,9 +510,44 @@ This example requests the status of a card
 }
 ```
 
+```bash
+$ gp -a b03c000000 -d
+...
+A>> T=1 (4+0000) B03C0000 00
+A<< (0012+2) (15ms) 000C00060000000000000001 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+	"protocolVersion": "000C",
+    "appletVersion": "0006",
+    "pinRemainingTries0": "00",
+    "ublkRemainingTries0": "00",
+    "pinRemainingTries1": "00",
+    "ublkRemainingTries1": "00",
+    "needs2FA" "00",
+    
+}
+```
+
+
+
 #### Response
 
-TODO
+| name                  | description                                        | length (bytes) |
+| --------------------- | -------------------------------------------------- | -------------- |
+| `protocolVersion`     | `{PROTOCOL_MAJOR_VERSION, PROTOCOL_MINOR_VERSION}` | 2              |
+| `appletVersion`       | `{APPLET_MAJOR_VERSION, APPLET_MINOR_VERSION}`     | 2              |
+| `pinRemainingTries0`  | The remaining tries for `PIN0`                     | 1              |
+| `ublkRemainingTries0` | The remaining tries for `UBLK0`                    | 1              |
+| `pinRemainingTries1`  | The remaining tries for `PIN1`                     | 1              |
+| `ublkRemainingTries1` | The remaining tries for `UBLK1`                    | 1              |
+|                       |                                                    |                |
+
+
 
 ### 3.11 Instruction `cardLabel`
 
