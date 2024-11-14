@@ -226,7 +226,7 @@ This response can be parsed in JSON as:
 
 #### Response
 
-None
+`None`
 
 ### 3.2 Instruction `importKey`
 
@@ -264,9 +264,25 @@ This function allows the import of a private ECkey into the card.
 }
 ```
 
+```bash
+$ gp -a b03200002c000c01000000000000000020
+...
+
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+	"statusBytes": "",
+    "statusBytesMsg": ""
+}
+```
+
 #### Response
 
-TODO
+None
 
 ### 3.3 Instruction `resetKey`
 
@@ -294,9 +310,25 @@ This function allows to reset a private ECkey stored in the card. If 2FA is enab
 }
 ```
 
+```bash
+$ gp -a b033000000
+...
+
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+	"statusBytes": "",
+    "statusBytesMsg": ""
+}
+```
+
 #### Response
 
-TODO
+None
 
 ### 3.4 Instruction `getPublicKeyFromPrivate`
 
@@ -388,9 +420,26 @@ This function verifies a PIN number sent by the DATA portion. The length of this
 }
 ```
 
+```bash
+$ gp -a b04200000430303030
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (26ms) 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+	"statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
+
 #### Response
 
-TODO
+`None`
 
 ### 3.7 Instruction `changePIN`
 
@@ -427,9 +476,26 @@ This example changes the PIN 0 from `0000` to `1111`
 }
 ```
 
+```bash
+$ gp -a b04400000a04303030300431313131
+...
+A>> T=1 (4+0010) B0440000 0A 04303030300431313131
+A<< (0000+2) (28ms) 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+	"statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
+
 #### Response
 
-TODO
+`None`
 
 ### 3.8 Instruction `unblockPIN`
 
