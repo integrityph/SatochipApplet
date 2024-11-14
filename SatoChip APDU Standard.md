@@ -266,18 +266,6 @@ This function allows the import of a private ECkey into the card.
 
 ```bash
 $ gp -a b03200002c000c01000000000000000020
-...
-
-...
-```
-
-This response can be parsed in JSON as:
-
-```json
-{
-	"statusBytes": "",
-    "statusBytesMsg": ""
-}
 ```
 
 #### Response
@@ -312,18 +300,6 @@ This function allows to reset a private ECkey stored in the card. If 2FA is enab
 
 ```bash
 $ gp -a b033000000
-...
-
-...
-```
-
-This response can be parsed in JSON as:
-
-```json
-{
-	"statusBytes": "",
-    "statusBytesMsg": ""
-}
 ```
 
 #### Response
@@ -527,7 +503,7 @@ This example unblocks the PIN 0 using unblock code `000000`.
 ```
 
 ```bash
-$ gp -a b046000006303030303030 -d
+$ gp -a b046000006303030303030
 ```
 
 #### Response
@@ -556,13 +532,42 @@ This example requests a list of all available PINs
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
-{  0xb0, 0x48, 0x00, 0x00, 0x00,
+{  0xb0, 0x48, 0x00, 0x00, 0x02,
+   0x00, 0x00
+}
+```
+
+```bash
+$ gp -a b04200000430303030 -a b048000002000002
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (27ms) 9000
+A>> T=1 (4+0002) B0480000 02 0000 02
+A<< (0002+2) (7ms) 0003 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+    //response for verifyPIN
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification",
+    //response for listPINs
+    "RFU": "00",
+    "PIN_mask": "03",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
 }
 ```
 
 #### Response
 
-TODO
+| Name       | Description             | Length (bytes) |
+| ---------- | ----------------------- | -------------- |
+| `RFU `     | Reserved for future use | 1              |
+| `PIN_mask` | Bit mask of in-use PIN  | 1              |
 
 ### 3.10 Instruction `getStatus`
 
@@ -701,22 +706,66 @@ This function imports a Bip32 seed to the applet and derives the master key and 
 
 | name        | description                                                  | length (bytes) | default value |
 | ----------- | ------------------------------------------------------------ | -------------- | ------------- |
-| `seed_data` | The BIP32 seed which is usually 64 bytes. This is not to be confused with BIP39 mnemonic phrase or its entropy. If you are starting with a mnemonic phrase, first derive a BIP32 seed from the entropy and send the derived seed. | var            | NA            |
+| `seed_data` | The BIP32 seed which is usually 39 bytes. This is not to be confused with BIP39 mnemonic phrase or its entropy. If you are starting with a mnemonic phrase, first derive a BIP32 seed from the entropy and send the derived seed. | var            | NA            |
 
 #### Request Examples
 
-This example imports a BIP32 seed into the card.
+This example imports a BIP32 seed into the card. This key was derived from the following pass phrase:
+
+```
+abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon diesel
+```
+
+The key is:
+
+```
+2f5f7bb39a1c678b0c3daba144ac0a1cb17227198acd5bf7eb7252a2b86e79e335541b09a77615
+```
+
+Note: we used http://bip32.org/ to derive this key.
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
-{  0xb0, 0x6c, 0x00, 0x00, 0x40,
+{  0xb0, 0x6c, 0x00, 0x00, 0x27,
    0x54, 0xed, 0x02 ,0xf3 ... // seed_data (64 bytes)
+}
+```
+
+```bash
+gp -a b06c0000272f5f7bb39a1c678b0c3daba144ac0a1cb17227198acd5bf7eb7252a2b86e79e335541b09a77615
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (27ms) 9000
+A>> T=1 (4+0039) B06C0000 27 2F5F7BB39A1C678B0C3DABA144AC0A1CB17227198ACD5BF7EB7252A2B86E79E335541B09A77615
+A<< (0107+2) (85ms) 0020F8E96D987C47468F643A144503C2C4EC0F0093C05892B4F6BAC16F0D3230B9ED0047304502204704ECCACF34777B4DFACE3C55342029E212E4D1B84B276DBAA6036C099EDBCD02210090A8F1EEDD57F08ACF661B6CB9457FA34BF12800E0B8BEBC197C0F09318BA4D8 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+    //response for verifyPIN
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification",
+    //response for importBIP32Seed
+	"coordx_size": "0020",
+    "coordx": "F8E96D987C47468F643A144503C2C4EC0F0093C05892B4F6BAC16F0D3230B9ED",
+    "sig_size": "0047",
+    "sig": "304502204704ECCACF34777B4DFACE3C55342029E212E4D1B84B276DBAA6036C099EDBCD02210090A8F1EEDD57F08ACF661B6CB9457FA34BF12800E0B8BEBC197C0F09318BA4D8",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
 }
 ```
 
 #### Response
 
-TODO
+| Name          | Description                      | Length (bytes) |
+| ------------- | -------------------------------- | -------------- |
+| `coordx_size` | size of `x-coordinate`           | 2              |
+| `coordx`      | `x-coordinate` of the public key |                |
+| `sig_size`    | size of `signature`              | 2              |
+| `sig`         | `signature`                      |                |
 
 ### 3.13 Instruction `resetBIP32Seed`
 
