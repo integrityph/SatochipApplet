@@ -757,7 +757,7 @@ Note: we used http://bip32.org/ to derive this key.
 ```
 
 ```bash
-gp -a b06c0000272f5f7bb39a1c678b0c3daba144ac0a1cb17227198acd5bf7eb7252a2b86e79e335541b09a77615
+gp -a b04200000430303030 -a b06c0000272f5f7bb39a1c678b0c3daba144ac0a1cb17227198acd5bf7eb7252a2b86e79e335541b09a77615
 ...
 A>> T=1 (4+0004) B0420000 04 30303030
 A<< (0000+2) (27ms) 9000
@@ -895,7 +895,7 @@ This response can be parsed in JSON as:
     "_comment": "response for getBIP32AuthentiKey",
 	"coordx_size": "0020",
     "coordx": "2716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B1E4C57EB",
-    "sig_size": "0048",
+    "sig_size": "0046",
     "sig": "3044022041785bcff62dc4840dad892074226c401f01aa50da1bb1a493eef96bd27bf0e1022046bba1cadcf81bb4a7ba4707caf8dd07283fcd2633176250c0f60219fc0b3e93",
     "statusBytes": "9000",
     "statusBytesMsg": "Normal: No further qualification"
@@ -940,7 +940,7 @@ This example requests the authntikey public key and it's signature.
 ```
 
 ```bash
-$ gp -a b0ad000000
+$ gp -a b04200000430303030 -a b0ad000000
 ...
 A>> T=1 (4+0004) B0420000 04 30303030
 A<< (0000+2) (26ms) 9000
@@ -949,11 +949,32 @@ A<< (0106+2) (51ms) 00202716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B
 ...
 ```
 
+This response can be parsed in JSON as:
 
+```json
+{
+    "_comment": "response for verifyPIN",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification",
+    
+    "_comment": "response for getBIP32AuthentiKey",
+	"coordx_size": "0020",
+    "coordx": "2716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B1E4C57EB",
+    "sig_size": "0046",
+    "sig": "3044022075F8101557E5384CEFE6CA4DDB4A40DFBAE86D69F775437ACD0AC7A29744274902204F0E226629FEB1E59EA0F8CEFC5076545651BA5BDAE8EB6D79613F3F002304A8",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
 
 #### Response
 
-TODO
+| Name          | Description                      | Length (bytes) |
+| ------------- | -------------------------------- | -------------- |
+| `coordx_size` | size of `x-coordinate`           | 2              |
+| `coordx`      | `x-coordinate` of the public key |                |
+| `sig_size`    | size of `sig`                    | 2              |
+| `sig`         | self-signed `x-coordinate`       |                |
 
 ### 3.16 Instruction `setBIP32AuthentikeyPubkey` [DEPRECATED]
 
