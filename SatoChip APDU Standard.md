@@ -789,9 +789,9 @@ This response can be parsed in JSON as:
 | Name          | Description                      | Length (bytes) |
 | ------------- | -------------------------------- | -------------- |
 | `coordx_size` | size of `x-coordinate`           | 2              |
-| `coordx`      | `x-coordinate` of the public key |                |
+| `coordx`      | `x-coordinate` of the public key | var            |
 | `sig_size`    | size of `sig`                    | 2              |
-| `sig`         | self-signed `x-coordinate`       |                |
+| `sig`         | self-signed `x-coordinate`       | var            |
 
 ### 3.13 Instruction `resetBIP32Seed`
 
@@ -907,9 +907,9 @@ This response can be parsed in JSON as:
 | Name          | Description                      | Length (bytes) |
 | ------------- | -------------------------------- | -------------- |
 | `coordx_size` | size of `x-coordinate`           | 2              |
-| `coordx`      | `x-coordinate` of the public key |                |
+| `coordx`      | `x-coordinate` of the public key | var            |
 | `sig_size`    | size of `sig`                    | 2              |
-| `sig`         | self-signed `x-coordinate`       |                |
+| `sig`         | self-signed `x-coordinate`       | var            |
 
 ### 3.15 Instruction `getAuthentiKey`
 
@@ -972,9 +972,9 @@ This response can be parsed in JSON as:
 | Name          | Description                      | Length (bytes) |
 | ------------- | -------------------------------- | -------------- |
 | `coordx_size` | size of `x-coordinate`           | 2              |
-| `coordx`      | `x-coordinate` of the public key |                |
+| `coordx`      | `x-coordinate` of the public key | var            |
 | `sig_size`    | size of `sig`                    | 2              |
-| `sig`         | self-signed `x-coordinate`       |                |
+| `sig`         | self-signed `x-coordinate`       | var            |
 
 ### 3.16 Instruction `setBIP32AuthentikeyPubkey` [DEPRECATED]
 
@@ -1035,7 +1035,7 @@ This response can be parsed in JSON as:
     
     "_comment": "response for getBIP32ExtendedKey",
     "chaincode": "F9945BB8B052BD0B0802C10C7C852E7765B69B61CE7233D9FE5A35AB108CA3B6",
-	"coordx_size": "0020",
+    "coordx_size": "0020",
     "coordx": "4C4D145791FB81AE5F5CC6B8290E12AB73818B1EAAA42A95C26F488DFCBD6887",
     "sig_size": "0047",
     "sig": "3045022100AFD1A7702B9406F26A721D1967B5040B16CAD90449C1AB38BFD1C83A76F52BA002207E3012B9AAABC4BD76FE3A4908A93BAA00AD6E63EF24F20D2F5E6D81ACB9A920",
@@ -1052,11 +1052,11 @@ This response can be parsed in JSON as:
 | ------------- | ------------------------------------ | -------------- |
 | `chaincode`   | used to generate child keys securely | 32             |
 | `coordx_size` | size of `x-coordinate`               | 2              |
-| `coordx`      | `x-coordinate` of the public key     |                |
+| `coordx`      | `x-coordinate` of the public key     | var            |
 | `sig_size`    | size of `sig`                        | 2              |
-| `sig`         | self-signed `x-coordinate`           |                |
+| `sig`         | self-signed `x-coordinate`           | var            |
 | `sig2_size`   | size of `sig2`                       | 2              |
-| `sig2`        | auth-signed `x-coordinate`           |                |
+| `sig2`        | auth-signed `x-coordinate`           | var            |
 
 ### 3.18 Instruction `setBIP32ExtendedPubkey` [DEPRECATED]
 
@@ -1102,6 +1102,30 @@ This example signs a message `hello world` using latest derived key using two re
 }
 ```
 
+```bash
+$ gp -a b04200000430303030 -a b06eff01040000000b
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (27ms) 9000
+A>> T=1 (4+0004) B06EFF01 04 0000000B
+A<< (0000+2) (10ms) 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+    "_comment": "response for verifyPIN",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification",
+    
+    "_comment": "response for signMessage Init",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
+
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
 {  0xb0, 0x6e, 0xff, 0x03, 0x0c,
@@ -1110,9 +1134,19 @@ This example signs a message `hello world` using latest derived key using two re
 }
 ```
 
+```bash
+$ gp -a b04200000430303030 -a b06eff030c0b68656c6c6f20776f726c64
+```
+
+
+
 #### Response
 
-TODO
+**Note**: For `Init`, no response.
+
+**Note**: For `Finalize`
+
+
 
 ### 3.20 Instruction `parseTransaction`
 
