@@ -551,10 +551,11 @@ This response can be parsed in JSON as:
 
 ```json
 {
-    //response for verifyPIN
+    "_comment": "response for verifyPIN",
     "statusBytes": "9000",
     "statusBytesMsg": "Normal: No further qualification",
-    //response for listPINs
+    
+    "_comment": "response for listPINs",
     "RFU": "00",
     "PIN_mask": "03",
     "statusBytes": "9000",
@@ -682,9 +683,33 @@ This example sets the label of the card as `test card`
 }
 ```
 
+```bash
+$ gp -a b04200000430303030 -a b03d00000a09746573742063617264 -d
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (26ms) 9000
+A>> T=1 (4+0010) B03D0000 0A 09746573742063617264
+A<< (0000+2) (12ms) 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+    "_comment": "response for verifyPIN",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification",
+    
+    "_comment": "response for cardLabel",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
+
 #### Response
 
-TODO
+`None`
 
 ### 3.12 Instruction `importBIP32Seed`
 
@@ -745,10 +770,11 @@ This response can be parsed in JSON as:
 
 ```json
 {
-    //response for verifyPIN
+    "_comment": "response for verifyPIN",
     "statusBytes": "9000",
     "statusBytesMsg": "Normal: No further qualification",
-    //response for importBIP32Seed
+    
+    "_comment": "response for importBIP32Seed",
 	"coordx_size": "0020",
     "coordx": "F8E96D987C47468F643A144503C2C4EC0F0093C05892B4F6BAC16F0D3230B9ED",
     "sig_size": "0047",
