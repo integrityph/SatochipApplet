@@ -752,7 +752,7 @@ Note: we used http://bip32.org/ to derive this key.
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
 {  0xb0, 0x6c, 0x00, 0x00, 0x27,
-   0x54, 0xed, 0x02 ,0xf3 ... // seed_data (64 bytes)
+   0x27, 0x2f, 0x5f, 0x7b, 0xb3, 0x9a, 0x1c, 0x67, 0x8b, 0x0c, 0x3d, 0xab, 0xa1, 0x44, 0xac, 0x0a, 0x1c, 0xb1, 0x72, 0x27, 0x19, 0x8a, 0xcd, 0x5b, 0xf7, 0xeb, 0x72, 0x52, 0xa2, 0xb8, 0x6e, 0x79, 0xe3, 0x35, 0x54, 0x1b, 0x09, 0xa7, 0x76, 0x15 // seed_data
 }
 ```
 
@@ -957,7 +957,7 @@ This response can be parsed in JSON as:
     "statusBytes": "9000",
     "statusBytesMsg": "Normal: No further qualification",
     
-    "_comment": "response for getBIP32AuthentiKey",
+    "_comment": "response for getAuthentiKey",
 	"coordx_size": "0020",
     "coordx": "2716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B1E4C57EB",
     "sig_size": "0046",
@@ -1015,9 +1015,48 @@ This example requests the extended public key for HD wallet path `M / 44' / 0' /
 }
 ```
 
+```bash
+$ gp -a b04200000430303030 -a b06d0000148000002c80000000800000000000000000000000
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (27ms) 9000
+A>> T=1 (4+0020) B06D0000 14 8000002C80000000800000000000000000000000
+A<< (0213+2) (135ms) F9945BB8B052BD0B0802C10C7C852E7765B69B61CE7233D9FE5A35AB108CA3B600204C4D145791FB81AE5F5CC6B8290E12AB73818B1EAAA42A95C26F488DFCBD688700473045022100AFD1A7702B9406F26A721D1967B5040B16CAD90449C1AB38BFD1C83A76F52BA002207E3012B9AAABC4BD76FE3A4908A93BAA00AD6E63EF24F20D2F5E6D81ACB9A92000483046022100C5AF18824AB45CBA28FE9CBBCA0BF0B4BD3CCC29D3F833DAD9EAF981AF61496F022100BBD26564C0D3F1A3FC372C4356FFF6885DC0B67F48E551B19DF48DFDFD11F3B1 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+    "_comment": "response for verifyPIN",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification",
+    
+    "_comment": "response for getBIP32ExtendedKey",
+    "chaincode": "F9945BB8B052BD0B0802C10C7C852E7765B69B61CE7233D9FE5A35AB108CA3B6",
+	"coordx_size": "0020",
+    "coordx": "4C4D145791FB81AE5F5CC6B8290E12AB73818B1EAAA42A95C26F488DFCBD6887",
+    "sig_size": "0047",
+    "sig": "3045022100AFD1A7702B9406F26A721D1967B5040B16CAD90449C1AB38BFD1C83A76F52BA002207E3012B9AAABC4BD76FE3A4908A93BAA00AD6E63EF24F20D2F5E6D81ACB9A920",
+    "sig2_size": "0048",
+    "sig2": "3046022100C5AF18824AB45CBA28FE9CBBCA0BF0B4BD3CCC29D3F833DAD9EAF981AF61496F022100BBD26564C0D3F1A3FC372C4356FFF6885DC0B67F48E551B19DF48DFDFD11F3B1",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
+
 #### Response
 
-TODO
+| Name          | Description                          | Length (bytes) |
+| ------------- | ------------------------------------ | -------------- |
+| `chaincode`   | used to generate child keys securely | 32             |
+| `coordx_size` | size of `x-coordinate`               | 2              |
+| `coordx`      | `x-coordinate` of the public key     |                |
+| `sig_size`    | size of `sig`                        | 2              |
+| `sig`         | self-signed `x-coordinate`           |                |
+| `sig2_size`   | size of `sig2`                       | 2              |
+| `sig2`        | auth-signed `x-coordinate`           |                |
 
 ### 3.18 Instruction `setBIP32ExtendedPubkey` [DEPRECATED]
 
