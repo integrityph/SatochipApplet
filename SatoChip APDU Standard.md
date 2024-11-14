@@ -820,14 +820,31 @@ This example resets the BIP32 seed on the card
 
 ```c++
 // CLA   INS   P1    P2    LC    CDATA ...
-{  0xb0, 0x77, 0x00, 0x00, 0x04,
+{  0xb0, 0x77, 0x04, 0x00, 0x04,
    0x30, 0x30, 0x30, 0x30 // PIN
+}
+```
+
+```bash
+$ gp -a b07704000430303030
+...
+A>> T=1 (4+0004) B0770400 04 30303030
+A<< (0000+2) (38ms) 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
 }
 ```
 
 #### Response
 
-TODO
+`None`
 
 ### 3.14 Instruction `getBIP32AuthentiKey`
 
