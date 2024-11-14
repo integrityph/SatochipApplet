@@ -762,7 +762,7 @@ gp -a b06c0000272f5f7bb39a1c678b0c3daba144ac0a1cb17227198acd5bf7eb7252a2b86e79e3
 A>> T=1 (4+0004) B0420000 04 30303030
 A<< (0000+2) (27ms) 9000
 A>> T=1 (4+0039) B06C0000 27 2F5F7BB39A1C678B0C3DABA144AC0A1CB17227198ACD5BF7EB7252A2B86E79E335541B09A77615
-A<< (0107+2) (85ms) 0020F8E96D987C47468F643A144503C2C4EC0F0093C05892B4F6BAC16F0D3230B9ED0047304502204704ECCACF34777B4DFACE3C55342029E212E4D1B84B276DBAA6036C099EDBCD02210090A8F1EEDD57F08ACF661B6CB9457FA34BF12800E0B8BEBC197C0F09318BA4D8 9000
+A<< (0107+2) (85ms) 00202716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B1E4C57EB0048304602210081E7E6845C803D345A92C34AB5825408FD301B756F2C67BCE43AAFFB83028F68022100C2D446A0B8CD581B56394EB60150E858E8167E438B45489D3FCE55F7862D70E0 9000
 ...
 ```
 
@@ -776,9 +776,9 @@ This response can be parsed in JSON as:
     
     "_comment": "response for importBIP32Seed",
 	"coordx_size": "0020",
-    "coordx": "F8E96D987C47468F643A144503C2C4EC0F0093C05892B4F6BAC16F0D3230B9ED",
-    "sig_size": "0047",
-    "sig": "304502204704ECCACF34777B4DFACE3C55342029E212E4D1B84B276DBAA6036C099EDBCD02210090A8F1EEDD57F08ACF661B6CB9457FA34BF12800E0B8BEBC197C0F09318BA4D8",
+    "coordx": "2716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B1E4C57EB",
+    "sig_size": "0048",
+    "sig": "304602210081E7E6845C803D345A92C34AB5825408FD301B756F2C67BCE43AAFFB83028F68022100C2D446A0B8CD581B56394EB60150E858E8167E438B45489D3FCE55F7862D70E0",
     "statusBytes": "9000",
     "statusBytesMsg": "Normal: No further qualification"
 }
@@ -790,8 +790,8 @@ This response can be parsed in JSON as:
 | ------------- | -------------------------------- | -------------- |
 | `coordx_size` | size of `x-coordinate`           | 2              |
 | `coordx`      | `x-coordinate` of the public key |                |
-| `sig_size`    | size of `signature`              | 2              |
-| `sig`         | `signature`                      |                |
+| `sig_size`    | size of `sig`                    | 2              |
+| `sig`         | self-signed `x-coordinate`       |                |
 
 ### 3.13 Instruction `resetBIP32Seed`
 
@@ -874,9 +874,42 @@ This example requests the authntikey public key and it's signature.
 }
 ```
 
+```bash
+$ gp -a b04200000430303030 -a b073000000
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (27ms) 9000
+A>> T=1 (4+0000) B0730000 00 
+A<< (0106+2) (51ms) 00202716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B1E4C57EB00463044022041785BCFF62DC4840DAD892074226C401F01AA50DA1BB1A493EEF96BD27BF0E1022046BBA1CADCF81BB4A7BA4707CAF8DD07283FCD2633176250C0F60219FC0B3E93 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+    "_comment": "response for verifyPIN",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification",
+    
+    "_comment": "response for getBIP32AuthentiKey",
+	"coordx_size": "0020",
+    "coordx": "2716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B1E4C57EB",
+    "sig_size": "0048",
+    "sig": "3044022041785bcff62dc4840dad892074226c401f01aa50da1bb1a493eef96bd27bf0e1022046bba1cadcf81bb4a7ba4707caf8dd07283fcd2633176250c0f60219fc0b3e93",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
+
 #### Response
 
-TODO
+| Name          | Description                      | Length (bytes) |
+| ------------- | -------------------------------- | -------------- |
+| `coordx_size` | size of `x-coordinate`           | 2              |
+| `coordx`      | `x-coordinate` of the public key |                |
+| `sig_size`    | size of `sig`                    | 2              |
+| `sig`         | self-signed `x-coordinate`       |                |
 
 ### 3.15 Instruction `getAuthentiKey`
 
@@ -905,6 +938,18 @@ This example requests the authntikey public key and it's signature.
 {  0xb0, 0xad, 0x00, 0x00, 0x00
 }
 ```
+
+```bash
+$ gp -a b0ad000000
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (26ms) 9000
+A>> T=1 (4+0000) B0AD0000 00 
+A<< (0106+2) (51ms) 00202716118B3DFB39DE8FD05B257AF1D3E9BD80C18753248CE7DC1D8E2B1E4C57EB00463044022075F8101557E5384CEFE6CA4DDB4A40DFBAE86D69F775437ACD0AC7A29744274902204F0E226629FEB1E59EA0F8CEFC5076545651BA5BDAE8EB6D79613F3F002304A8 9000
+...
+```
+
+
 
 #### Response
 
