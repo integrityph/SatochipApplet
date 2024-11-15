@@ -427,7 +427,7 @@ public class CardEdge extends javacard.framework.Applet {
     
     // secure channel
     private static final byte[] CST_SC = {'s','c','_','k','e','y', 's','c','_','m','a','c'};
-    private boolean needs_secure_channel= true;
+    private boolean needs_secure_channel= false;
     private boolean initialized_secure_channel= false;
     private ECPrivateKey sc_ephemeralkey; 
     private AESKey sc_sessionkey;
@@ -468,7 +468,7 @@ public class CardEdge extends javacard.framework.Applet {
      * Methods                              *
      ****************************************/
 
-    private CardEdge(byte[] bArray, short bOffset, byte bLength) {
+    private test1(byte[] bArray, short bOffset, byte bLength) {
         // FIXED: something should be done already here, not only with setup APDU
         
         /* If init pin code does not satisfy policies, internal error */
@@ -577,7 +577,7 @@ public class CardEdge extends javacard.framework.Applet {
     } // end of constructor
 
     public static void install(byte[] bArray, short bOffset, byte bLength) {
-        CardEdge wal = new CardEdge(bArray, bOffset, bLength);
+    	test1 wal = new test1(bArray, bOffset, bLength);
     }
 
     public boolean select() {
@@ -819,28 +819,31 @@ public class CardEdge extends javacard.framework.Applet {
         if (sizeout==0){
             return;
         }
-        else if ((ins == (byte) INS_GET_STATUS) || (ins == (byte) INS_INIT_SECURE_CHANNEL)) {
-            apdu.setOutgoingAndSend((short) 0, sizeout);
-        }
-        else if (needs_secure_channel) { // encrypt response
-            // buffer contains the data (sizeout)
-            // for encryption, data is padded with PKCS#7
-            short blocksize=(short)16;
-            short padsize= (short) (blocksize - (sizeout%blocksize));
-            
-            Util.arrayCopy(buffer, (short)0, tmpBuffer, (short)0, sizeout);
-            Util.arrayFillNonAtomic(tmpBuffer, sizeout, padsize, (byte)padsize);//padding
-            Util.arrayCopy(sc_buffer, OFFSET_SC_IV, buffer, (short)0, SIZE_SC_IV);
-            sc_aes128_cbc.init(sc_sessionkey, Cipher.MODE_ENCRYPT, sc_buffer, OFFSET_SC_IV, SIZE_SC_IV);
-            short sizeoutCrypt=sc_aes128_cbc.doFinal(tmpBuffer, (short)0, (short)(sizeout+padsize), buffer, (short) (18));
-            Util.setShort(buffer, (short)16, sizeoutCrypt);
-            sizeout= (short)(18+sizeoutCrypt);
-            //send back
-            apdu.setOutgoingAndSend((short) 0, sizeout);
-        }
-        else {
-            apdu.setOutgoingAndSend((short) 0, sizeout);
-        }
+        apdu.setOutgoingAndSend((short) 0, sizeout);
+        return;
+        
+//        else if ((ins == (byte) INS_GET_STATUS) || (ins == (byte) INS_INIT_SECURE_CHANNEL)) {
+//            apdu.setOutgoingAndSend((short) 0, sizeout);
+//        }
+//        else if (needs_secure_channel) { // encrypt response
+//            // buffer contains the data (sizeout)
+//            // for encryption, data is padded with PKCS#7
+//            short blocksize=(short)16;
+//            short padsize= (short) (blocksize - (sizeout%blocksize));
+//            
+//            Util.arrayCopy(buffer, (short)0, tmpBuffer, (short)0, sizeout);
+//            Util.arrayFillNonAtomic(tmpBuffer, sizeout, padsize, (byte)padsize);//padding
+//            Util.arrayCopy(sc_buffer, OFFSET_SC_IV, buffer, (short)0, SIZE_SC_IV);
+//            sc_aes128_cbc.init(sc_sessionkey, Cipher.MODE_ENCRYPT, sc_buffer, OFFSET_SC_IV, SIZE_SC_IV);
+//            short sizeoutCrypt=sc_aes128_cbc.doFinal(tmpBuffer, (short)0, (short)(sizeout+padsize), buffer, (short) (18));
+//            Util.setShort(buffer, (short)16, sizeoutCrypt);
+//            sizeout= (short)(18+sizeoutCrypt);
+//            //send back
+//            apdu.setOutgoingAndSend((short) 0, sizeout);
+//        }
+//        else {
+//            apdu.setOutgoingAndSend((short) 0, sizeout);
+//        }
         
     } // end of process method
 
@@ -926,7 +929,7 @@ public class CardEdge extends javacard.framework.Applet {
         bytesLeft-=3;
         
         if (!CheckPINPolicy(buffer, base, numBytes))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
+        	ISOException.throwIt(SW_INVALID_PARAMETER);
         
         if (pins[1]==null)
             pins[1] = new OwnerPIN(pin_tries, PIN_MAX_SIZE);
@@ -1196,2050 +1199,2050 @@ public class CardEdge extends javacard.framework.Applet {
      * This function allows to reset a private ECkey stored in the card.
      * If 2FA is enabled, a hmac code must be provided to reset the key.
      * 
-     * ins: 0x33
-     * p1: private key number (0x00-0x0F)
-     * p2: 0x00
-     * data: [ (option)HMAC-2FA(20b)] 
-     * return: none
-     */
-    private short ResetKey(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        byte key_nb = buffer[ISO7816.OFFSET_P1];
-        if ((key_nb < 0) || (key_nb >= MAX_NUM_KEYS))
-            ISOException.throwIt(SW_INCORRECT_P1);
-        
-        Key key = eckeys[key_nb];
-        // check type and size
-        if ((key == null) || !key.isInitialized())
-            ISOException.throwIt(SW_INCORRECT_P1);
-        
-        // check 2FA if required
-        if (needs_2FA){
-            short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-            
-            if (bytesLeft < (short)20)
-                ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-            
-            // compute the corresponding partial public key...
-            keyAgreement.init((ECPrivateKey)key);
-            keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, tmpBuffer, (short)0); //pubkey in uncompressed form (65b)
-            // hmac of 64-bytes msg: (pubkey-x | 32bytes (0x20^key_nb)-padding)
-            Util.arrayFillNonAtomic(recvBuffer, (short)33, (short)32, (byte) (0x20^key_nb));
-            HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)1, (short)64, recvBuffer, (short)65);
-            if (Util.arrayCompare(buffer, ISO7816.OFFSET_CDATA, recvBuffer, (short)65, (short)20)!=0)
-                ISOException.throwIt(SW_SIGNATURE_INVALID);         
-        }
-        
-        // clear key & reset flag
-        key.clearKey();
-        eckeys_flag &= (short) ~(0x0001 << key_nb);// reset corresponding bit flag;
-        
-        return (short)0;
-    }
-    
-    /** 
-     * This function returns the public key associated with a particular private key stored 
-     * in the applet. The exact key blob contents depend on the key algorithm and type. 
-     * 
-     * ins: 0x35
-     * p1: private key number (0x00-0x0F)
-     * p2: 0x00
-     * data: none 
-     * return(SECP256K1): [coordx_size(2b) | pubkey_coordx | sig_size(2b) | sig]
-     */
-    private short getPublicKeyFromPrivate(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        
-        byte key_nb = buffer[ISO7816.OFFSET_P1];
-        if ((key_nb < 0) || (key_nb >= MAX_NUM_KEYS))
-            ISOException.throwIt(SW_INCORRECT_P1);
-        
-        Key key = eckeys[key_nb];
-        // check type and size
-        if ((key == null) || !key.isInitialized())
-            ISOException.throwIt(SW_INCORRECT_P1);
-        if (key.getType() != KeyBuilder.TYPE_EC_FP_PRIVATE)
-            ISOException.throwIt(SW_INCORRECT_ALG);     
-        if (key.getSize()!= LENGTH_EC_FP_256)
-            ISOException.throwIt(SW_INCORRECT_ALG);
-        // check the curve param
-        if(!Secp256k1.checkCurveParameters((ECPrivateKey)key, recvBuffer, (short)0))
-            ISOException.throwIt(SW_INCORRECT_ALG);
-                
-        // compute the corresponding partial public key...
-        keyAgreement.init((ECPrivateKey)key);
-        keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, buffer, (short)1); //pubkey in uncompressed form
-        Util.setShort(buffer, (short)0, BIP32_KEY_SIZE);
-        
-        // sign fixed message
-        sigECDSA.init(key, Signature.MODE_SIGN);
-        short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2), buffer, (short)(BIP32_KEY_SIZE+4));
-        Util.setShort(buffer, (short)(BIP32_KEY_SIZE+2), sign_size);
-        
-        // return x-coordinate of public key+signature
-        // the client can recover full public-key from the signature or
-        // by guessing the compression value () and verifying the signature... 
-        return (short)(2+BIP32_KEY_SIZE+2+sign_size);
-    }       
+    * ins: 0x33
+    * p1: private key number (0x00-0x0F)
+    * p2: 0x00
+    * data: [ (option)HMAC-2FA(20b)] 
+    * return: none
+    */
+   private short ResetKey(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       byte key_nb = buffer[ISO7816.OFFSET_P1];
+       if ((key_nb < 0) || (key_nb >= MAX_NUM_KEYS))
+           ISOException.throwIt(SW_INCORRECT_P1);
+       
+       Key key = eckeys[key_nb];
+       // check type and size
+       if ((key == null) || !key.isInitialized())
+           ISOException.throwIt(SW_INCORRECT_P1);
+       
+       // check 2FA if required
+       if (needs_2FA){
+           short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+           
+           if (bytesLeft < (short)20)
+               ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+           
+           // compute the corresponding partial public key...
+           keyAgreement.init((ECPrivateKey)key);
+           keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, tmpBuffer, (short)0); //pubkey in uncompressed form (65b)
+           // hmac of 64-bytes msg: (pubkey-x | 32bytes (0x20^key_nb)-padding)
+           Util.arrayFillNonAtomic(recvBuffer, (short)33, (short)32, (byte) (0x20^key_nb));
+           HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)1, (short)64, recvBuffer, (short)65);
+           if (Util.arrayCompare(buffer, ISO7816.OFFSET_CDATA, recvBuffer, (short)65, (short)20)!=0)
+               ISOException.throwIt(SW_SIGNATURE_INVALID);         
+       }
+       
+       // clear key & reset flag
+       key.clearKey();
+       eckeys_flag &= (short) ~(0x0001 << key_nb);// reset corresponding bit flag;
+       
+       return (short)0;
+   }
+   
+   /** 
+    * This function returns the public key associated with a particular private key stored 
+    * in the applet. The exact key blob contents depend on the key algorithm and type. 
+    * 
+    * ins: 0x35
+    * p1: private key number (0x00-0x0F)
+    * p2: 0x00
+    * data: none 
+    * return(SECP256K1): [coordx_size(2b) | pubkey_coordx | sig_size(2b) | sig]
+    */
+   private short getPublicKeyFromPrivate(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       
+       byte key_nb = buffer[ISO7816.OFFSET_P1];
+       if ((key_nb < 0) || (key_nb >= MAX_NUM_KEYS))
+           ISOException.throwIt(SW_INCORRECT_P1);
+       
+       Key key = eckeys[key_nb];
+       // check type and size
+       if ((key == null) || !key.isInitialized())
+           ISOException.throwIt(SW_INCORRECT_P1);
+       if (key.getType() != KeyBuilder.TYPE_EC_FP_PRIVATE)
+           ISOException.throwIt(SW_INCORRECT_ALG);     
+       if (key.getSize()!= LENGTH_EC_FP_256)
+           ISOException.throwIt(SW_INCORRECT_ALG);
+       // check the curve param
+       if(!Secp256k1.checkCurveParameters((ECPrivateKey)key, recvBuffer, (short)0))
+           ISOException.throwIt(SW_INCORRECT_ALG);
+               
+       // compute the corresponding partial public key...
+       keyAgreement.init((ECPrivateKey)key);
+       keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, buffer, (short)1); //pubkey in uncompressed form
+       Util.setShort(buffer, (short)0, BIP32_KEY_SIZE);
+       
+       // sign fixed message
+       sigECDSA.init(key, Signature.MODE_SIGN);
+       short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2), buffer, (short)(BIP32_KEY_SIZE+4));
+       Util.setShort(buffer, (short)(BIP32_KEY_SIZE+2), sign_size);
+       
+       // return x-coordinate of public key+signature
+       // the client can recover full public-key from the signature or
+       // by guessing the compression value () and verifying the signature... 
+       return (short)(2+BIP32_KEY_SIZE+2+sign_size);
+   }       
 
-    /** 
-     * This function creates a PIN with parameters specified by the P1, P2 and DATA
-     * values. P2 specifies the maximum number of consecutive unsuccessful
-     * verifications before the PIN blocks. PIN can be created only if one of the logged identities
-     * allows it. 
-     * 
-     * ins: 0x40
-     * p1: PIN number (0x00-0x07)
-     * p2: max attempt number
-     * data: [PIN_size(1b) | PIN | UBLK_size(1b) | UBLK] 
-     * return: none
-     */
-    private short CreatePIN(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        byte pin_nb = buffer[ISO7816.OFFSET_P1];
-        byte num_tries = buffer[ISO7816.OFFSET_P2];
-        
-        if ((pin_nb < 0) || (pin_nb >= MAX_NUM_PINS) || (pins[pin_nb] != null))
-            ISOException.throwIt(SW_INCORRECT_P1);
-        /* Allow pin lengths > 127 (useful at all ?) */
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        // At least 1 character for PIN and 1 for unblock code (+ lengths)
-        if (bytesLeft < 4)
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        byte pin_size = buffer[ISO7816.OFFSET_CDATA];
-        if (bytesLeft < (short) (1 + pin_size + 1))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        if (!CheckPINPolicy(buffer, (short) (ISO7816.OFFSET_CDATA + 1), pin_size))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        byte ucode_size = buffer[(short) (ISO7816.OFFSET_CDATA + 1 + pin_size)];
-        if (bytesLeft != (short) (1 + pin_size + 1 + ucode_size))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        if (!CheckPINPolicy(buffer, (short) (ISO7816.OFFSET_CDATA + 1 + pin_size + 1), ucode_size))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        pins[pin_nb] = new OwnerPIN(num_tries, PIN_MAX_SIZE);
-        pins[pin_nb].update(buffer, (short) (ISO7816.OFFSET_CDATA + 1), pin_size);
-        ublk_pins[pin_nb] = new OwnerPIN((byte) 3, PIN_MAX_SIZE);
-        // Recycle variable pin_size
-        pin_size = (byte) (ISO7816.OFFSET_CDATA + 1 + pin_size + 1);
-        ublk_pins[pin_nb].update(buffer, pin_size, ucode_size);
-        
-        return (short)0;
-    }
+   /** 
+    * This function creates a PIN with parameters specified by the P1, P2 and DATA
+    * values. P2 specifies the maximum number of consecutive unsuccessful
+    * verifications before the PIN blocks. PIN can be created only if one of the logged identities
+    * allows it. 
+    * 
+    * ins: 0x40
+    * p1: PIN number (0x00-0x07)
+    * p2: max attempt number
+    * data: [PIN_size(1b) | PIN | UBLK_size(1b) | UBLK] 
+    * return: none
+    */
+   private short CreatePIN(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       byte pin_nb = buffer[ISO7816.OFFSET_P1];
+       byte num_tries = buffer[ISO7816.OFFSET_P2];
+       
+       if ((pin_nb < 0) || (pin_nb >= MAX_NUM_PINS) || (pins[pin_nb] != null))
+           ISOException.throwIt(SW_INCORRECT_P1);
+       /* Allow pin lengths > 127 (useful at all ?) */
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       // At least 1 character for PIN and 1 for unblock code (+ lengths)
+       if (bytesLeft < 4)
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       byte pin_size = buffer[ISO7816.OFFSET_CDATA];
+       if (bytesLeft < (short) (1 + pin_size + 1))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       if (!CheckPINPolicy(buffer, (short) (ISO7816.OFFSET_CDATA + 1), pin_size))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       byte ucode_size = buffer[(short) (ISO7816.OFFSET_CDATA + 1 + pin_size)];
+       if (bytesLeft != (short) (1 + pin_size + 1 + ucode_size))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       if (!CheckPINPolicy(buffer, (short) (ISO7816.OFFSET_CDATA + 1 + pin_size + 1), ucode_size))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       pins[pin_nb] = new OwnerPIN(num_tries, PIN_MAX_SIZE);
+       pins[pin_nb].update(buffer, (short) (ISO7816.OFFSET_CDATA + 1), pin_size);
+       ublk_pins[pin_nb] = new OwnerPIN((byte) 3, PIN_MAX_SIZE);
+       // Recycle variable pin_size
+       pin_size = (byte) (ISO7816.OFFSET_CDATA + 1 + pin_size + 1);
+       ublk_pins[pin_nb].update(buffer, pin_size, ucode_size);
+       
+       return (short)0;
+   }
 
-    /** 
-     * This function verifies a PIN number sent by the DATA portion. The length of
-     * this PIN is specified by the value contained in P3.
-     * Multiple consecutive unsuccessful PIN verifications will block the PIN. If a PIN
-     * blocks, then an UnblockPIN command can be issued.
-     * 
-     * ins: 0x42
-     * p1: PIN number (0x00-0x07)
-     * p2: 0x00
-     * data: [PIN] 
-     * return: none (throws an exception in case of wrong PIN)
-     */
-    private short VerifyPIN(APDU apdu, byte[] buffer) {
-        byte pin_nb = buffer[ISO7816.OFFSET_P1];
-        if ((pin_nb < 0) || (pin_nb >= MAX_NUM_PINS))
-            ISOException.throwIt(SW_INCORRECT_P1);
-        OwnerPIN pin = pins[pin_nb];
-        if (pin == null)
-            ISOException.throwIt(SW_INCORRECT_P1);
-        if (buffer[ISO7816.OFFSET_P2] != 0x00)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        /*
-         * Here I suppose the PIN code is small enough to enter in the buffer
-         * TODO: Verify the assumption and eventually adjust code to support
-         * reading PIN in multiple read()s
-         */
-        if (!CheckPINPolicy(buffer, ISO7816.OFFSET_CDATA, (byte) bytesLeft))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        byte triesRemaining = pin.getTriesRemaining();
-        if (triesRemaining == (byte) 0x00)
-            ISOException.throwIt(SW_IDENTITY_BLOCKED);
-        if (!pin.check(buffer, (short) ISO7816.OFFSET_CDATA, (byte) bytesLeft)) {
-            LogoutIdentity(pin_nb);
-            ISOException.throwIt((short)(SW_PIN_FAILED + triesRemaining - 1));
-        }
-        
-        // Actually register that PIN has been successfully verified.
-        logged_ids |= (short) (0x0001 << pin_nb);
-        
-        return (short)0;
-    }
+   /** 
+    * This function verifies a PIN number sent by the DATA portion. The length of
+    * this PIN is specified by the value contained in P3.
+    * Multiple consecutive unsuccessful PIN verifications will block the PIN. If a PIN
+    * blocks, then an UnblockPIN command can be issued.
+    * 
+    * ins: 0x42
+    * p1: PIN number (0x00-0x07)
+    * p2: 0x00
+    * data: [PIN] 
+    * return: none (throws an exception in case of wrong PIN)
+    */
+   private short VerifyPIN(APDU apdu, byte[] buffer) {
+       byte pin_nb = buffer[ISO7816.OFFSET_P1];
+       if ((pin_nb < 0) || (pin_nb >= MAX_NUM_PINS))
+           ISOException.throwIt(SW_INCORRECT_P1);
+       OwnerPIN pin = pins[pin_nb];
+       if (pin == null)
+           ISOException.throwIt(SW_INCORRECT_P1);
+       if (buffer[ISO7816.OFFSET_P2] != 0x00)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       /*
+        * Here I suppose the PIN code is small enough to enter in the buffer
+        * TODO: Verify the assumption and eventually adjust code to support
+        * reading PIN in multiple read()s
+        */
+       if (!CheckPINPolicy(buffer, ISO7816.OFFSET_CDATA, (byte) bytesLeft))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       byte triesRemaining = pin.getTriesRemaining();
+       if (triesRemaining == (byte) 0x00)
+           ISOException.throwIt(SW_IDENTITY_BLOCKED);
+       if (!pins[pin_nb].check(buffer, (short) ISO7816.OFFSET_CDATA, (byte) bytesLeft)) {
+           LogoutIdentity(pin_nb);
+           ISOException.throwIt((short)(SW_PIN_FAILED + triesRemaining - 1));
+       }
+       
+       // Actually register that PIN has been successfully verified.
+       logged_ids |= (short) (0x0001 << pin_nb);
+       
+       return (short)0;
+   }
 
-    
-    /** 
-     * This function changes a PIN code. The DATA portion contains both the old and
-     * the new PIN codes. 
-     * 
-     * ins: 0x44
-     * p1: PIN number (0x00-0x07)
-     * p2: 0x00
-     * data: [PIN_size(1b) | old_PIN | PIN_size(1b) | new_PIN ] 
-     * return: none (throws an exception in case of wrong PIN)
-     */
-    private short ChangePIN(APDU apdu, byte[] buffer) {
-        /*
-         * Here I suppose the PIN code is small enough that 2 of them enter in
-         * the buffer TODO: Verify the assumption and eventually adjust code to
-         * support reading PINs in multiple read()s
-         */
-        byte pin_nb = buffer[ISO7816.OFFSET_P1];
-        if ((pin_nb < 0) || (pin_nb >= MAX_NUM_PINS))
-            ISOException.throwIt(SW_INCORRECT_P1);
-        OwnerPIN pin = pins[pin_nb];
-        if (pin == null)
-            ISOException.throwIt(SW_INCORRECT_P1);
-        if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        // At least 1 character for each PIN code
-        if (bytesLeft < 4)
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        byte pin_size = buffer[ISO7816.OFFSET_CDATA];
-        if (bytesLeft < (short) (1 + pin_size + 1))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        if (!CheckPINPolicy(buffer, (short) (ISO7816.OFFSET_CDATA + 1), pin_size))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        byte new_pin_size = buffer[(short) (ISO7816.OFFSET_CDATA + 1 + pin_size)];
-        if (bytesLeft < (short) (1 + pin_size + 1 + new_pin_size))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        if (!CheckPINPolicy(buffer, (short) (ISO7816.OFFSET_CDATA + 1 + pin_size + 1), new_pin_size))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        
-        byte triesRemaining = pin.getTriesRemaining();
-        if (triesRemaining == (byte) 0x00)
-            ISOException.throwIt(SW_IDENTITY_BLOCKED);
-        if (!pin.check(buffer, (short) (ISO7816.OFFSET_CDATA + 1), pin_size)) {
-            LogoutIdentity(pin_nb);
-            ISOException.throwIt((short)(SW_PIN_FAILED + triesRemaining - 1));
-        }
-        
-        pin.update(buffer, (short) (ISO7816.OFFSET_CDATA + 1 + pin_size + 1), new_pin_size);
-        // JC specifies this resets the validated flag. So we do.
-        logged_ids &= (short) ((short) 0xFFFF ^ (0x01 << pin_nb));
-        
-        return (short)0;
-    }
+   
+   /** 
+    * This function changes a PIN code. The DATA portion contains both the old and
+    * the new PIN codes. 
+    * 
+    * ins: 0x44
+    * p1: PIN number (0x00-0x07)
+    * p2: 0x00
+    * data: [PIN_size(1b) | old_PIN | PIN_size(1b) | new_PIN ] 
+    * return: none (throws an exception in case of wrong PIN)
+    */
+   private short ChangePIN(APDU apdu, byte[] buffer) {
+       /*
+        * Here I suppose the PIN code is small enough that 2 of them enter in
+        * the buffer TODO: Verify the assumption and eventually adjust code to
+        * support reading PINs in multiple read()s
+        */
+       byte pin_nb = buffer[ISO7816.OFFSET_P1];
+       if ((pin_nb < 0) || (pin_nb >= MAX_NUM_PINS))
+           ISOException.throwIt(SW_INCORRECT_P1);
+       OwnerPIN pin = pins[pin_nb];
+       if (pin == null)
+           ISOException.throwIt(SW_INCORRECT_P1);
+       if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       // At least 1 character for each PIN code
+       if (bytesLeft < 4)
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       byte pin_size = buffer[ISO7816.OFFSET_CDATA];
+       if (bytesLeft < (short) (1 + pin_size + 1))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       if (!CheckPINPolicy(buffer, (short) (ISO7816.OFFSET_CDATA + 1), pin_size))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       byte new_pin_size = buffer[(short) (ISO7816.OFFSET_CDATA + 1 + pin_size)];
+       if (bytesLeft < (short) (1 + pin_size + 1 + new_pin_size))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       if (!CheckPINPolicy(buffer, (short) (ISO7816.OFFSET_CDATA + 1 + pin_size + 1), new_pin_size))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       
+       byte triesRemaining = pin.getTriesRemaining();
+       if (triesRemaining == (byte) 0x00)
+           ISOException.throwIt(SW_IDENTITY_BLOCKED);
+       if (!pin.check(buffer, (short) (ISO7816.OFFSET_CDATA + 1), pin_size)) {
+           LogoutIdentity(pin_nb);
+           ISOException.throwIt((short)(SW_PIN_FAILED + triesRemaining - 1));
+       }
+       
+       pin.update(buffer, (short) (ISO7816.OFFSET_CDATA + 1 + pin_size + 1), new_pin_size);
+       // JC specifies this resets the validated flag. So we do.
+       logged_ids &= (short) ((short) 0xFFFF ^ (0x01 << pin_nb));
+       
+       return (short)0;
+   }
 
-    /**
-     * This function unblocks a PIN number using the unblock code specified in the
-     * DATA portion. The P3 byte specifies the unblock code length. 
-     * 
-     * ins: 0x46
-     * p1: PIN number (0x00-0x07)
-     * p2: 0x00
-     * data: [PUK] 
-     * return: none (throws an exception in case of wrong PUK)
-     */
-    private short UnblockPIN(APDU apdu, byte[] buffer) {
-        byte pin_nb = buffer[ISO7816.OFFSET_P1];
-        if ((pin_nb < 0) || (pin_nb >= MAX_NUM_PINS))
-            ISOException.throwIt(SW_INCORRECT_P1);
-        OwnerPIN pin = pins[pin_nb];
-        OwnerPIN ublk_pin = ublk_pins[pin_nb];
-        if (pin == null)
-            ISOException.throwIt(SW_INCORRECT_P1);
-        if (ublk_pin == null)
-            ISOException.throwIt(SW_INTERNAL_ERROR);
-        // If the PIN is not blocked, the call is inconsistent
-        if (pin.getTriesRemaining() != 0)
-            ISOException.throwIt(SW_OPERATION_NOT_ALLOWED);
-        if (buffer[ISO7816.OFFSET_P2] != 0x00)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        /*
-         * Here I suppose the PIN code is small enough to fit into the buffer
-         * TODO: Verify the assumption and eventually adjust code to support
-         * reading PIN in multiple read()s
-         */
-        if (!CheckPINPolicy(buffer, ISO7816.OFFSET_CDATA, (byte) bytesLeft))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        byte triesRemaining = ublk_pin.getTriesRemaining();
-        if (triesRemaining == (byte) 0x00)
-            ISOException.throwIt(SW_IDENTITY_BLOCKED);
-        if (!ublk_pin.check(buffer, ISO7816.OFFSET_CDATA, (byte) bytesLeft))
-            ISOException.throwIt((short)(SW_PIN_FAILED + triesRemaining - 1));
-        
-        pin.resetAndUnblock();
-        
-        return (short)0;
-    }
+   /**
+    * This function unblocks a PIN number using the unblock code specified in the
+    * DATA portion. The P3 byte specifies the unblock code length. 
+    * 
+    * ins: 0x46
+    * p1: PIN number (0x00-0x07)
+    * p2: 0x00
+    * data: [PUK] 
+    * return: none (throws an exception in case of wrong PUK)
+    */
+   private short UnblockPIN(APDU apdu, byte[] buffer) {
+       byte pin_nb = buffer[ISO7816.OFFSET_P1];
+       if ((pin_nb < 0) || (pin_nb >= MAX_NUM_PINS))
+           ISOException.throwIt(SW_INCORRECT_P1);
+       OwnerPIN pin = pins[pin_nb];
+       OwnerPIN ublk_pin = ublk_pins[pin_nb];
+       if (pin == null)
+           ISOException.throwIt(SW_INCORRECT_P1);
+       if (ublk_pin == null)
+           ISOException.throwIt(SW_INTERNAL_ERROR);
+       // If the PIN is not blocked, the call is inconsistent
+       if (pin.getTriesRemaining() != 0)
+           ISOException.throwIt(SW_OPERATION_NOT_ALLOWED);
+       if (buffer[ISO7816.OFFSET_P2] != 0x00)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       /*
+        * Here I suppose the PIN code is small enough to fit into the buffer
+        * TODO: Verify the assumption and eventually adjust code to support
+        * reading PIN in multiple read()s
+        */
+       if (!CheckPINPolicy(buffer, ISO7816.OFFSET_CDATA, (byte) bytesLeft))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       byte triesRemaining = ublk_pin.getTriesRemaining();
+       if (triesRemaining == (byte) 0x00)
+           ISOException.throwIt(SW_IDENTITY_BLOCKED);
+       if (!ublk_pin.check(buffer, ISO7816.OFFSET_CDATA, (byte) bytesLeft))
+           ISOException.throwIt((short)(SW_PIN_FAILED + triesRemaining - 1));
+       
+       pin.resetAndUnblock();
+       
+       return (short)0;
+   }
 
-    private short LogOutAll() {
-        logged_ids = (short) 0x0000; // Nobody is logged in
-        byte i;
-        for (i = (byte) 0; i < MAX_NUM_PINS; i++)
-            if (pins[i] != null)
-                pins[i].reset();
-        
-        return (short)0;
-    }
-    
-    /**
-     * This function returns a 2 byte bit mask of the available PINs that are currently in
-     * use. Each set bit corresponds to an active PIN.
-     * 
-     *  ins: 0x48
-     *  p1: 0x00
-     *  p2: 0x00
-     *  data: none
-     *  return: [RFU(1b) | PIN_mask(1b)]
-     */
-    private short ListPINs(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        // Checking P1 & P2
-        if (buffer[ISO7816.OFFSET_P1] != (byte) 0x00)
-            ISOException.throwIt(SW_INCORRECT_P1);
-        if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        byte expectedBytes = (byte) (buffer[ISO7816.OFFSET_LC]);
-        if (expectedBytes != (short) 2)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        // Build the PIN bit mask
-        short mask = (short) 0x00;
-        short b;
-        for (b = (short) 0; b < MAX_NUM_PINS; b++)
-            if (pins[b] != null)
-                mask |= (short) (((short) 0x01) << b);
-        // Fill the buffer
-        Util.setShort(buffer, (short) 0, mask);
-        // Send response
-        return (short)2;
-    }
-    
-    /**
-     * This function retrieves general information about the Applet running on the smart
-     * card, and useful information about the status of current session such as:
-     *      - applet version (4b)
-     *  
-     *  ins: 0x3C
-     *  p1: 0x00 
-     *  p2: 0x00 
-     *  data: none
-     *  return: [versions(4b) | PIN0-PUK0-PIN1-PUK1 tries (4b) | needs2FA (1b) | is_seeded(1b) | setupDone(1b) | needs_secure_channel(1b)]
-     */
-    private short GetStatus(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        //if (!pins[0].isValidated())
-        //  ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        if (buffer[ISO7816.OFFSET_P1] != (byte) 0x00)
-            ISOException.throwIt(SW_INCORRECT_P1);
-        if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        
-        short pos = (short) 0;
-        buffer[pos++] = (byte) PROTOCOL_MAJOR_VERSION; // Major Card Edge Protocol version n.
-        buffer[pos++] = (byte) PROTOCOL_MINOR_VERSION; // Minor Card Edge Protocol version n.
-        buffer[pos++] = (byte) APPLET_MAJOR_VERSION; // Major Applet version n.
-        buffer[pos++] = (byte) APPLET_MINOR_VERSION; // Minor Applet version n.
-        // PIN/PUK remaining tries available
-        if (setupDone){
-            buffer[pos++] = pins[0].getTriesRemaining();
-            buffer[pos++] = ublk_pins[0].getTriesRemaining();
-            buffer[pos++] = pins[1].getTriesRemaining();
-            buffer[pos++] = ublk_pins[1].getTriesRemaining();
-        } else {
-            buffer[pos++] = (byte) 0;
-            buffer[pos++] = (byte) 0;
-            buffer[pos++] = (byte) 0;
-            buffer[pos++] = (byte) 0;
-        }
-        if (needs_2FA)
-            buffer[pos++] = (byte)0x01;
-        else
-            buffer[pos++] = (byte)0x00;
-        if (bip32_seeded)
-            buffer[pos++] = (byte)0x01;
-        else
-            buffer[pos++] = (byte)0x00;
-        if (setupDone)
-            buffer[pos++] = (byte)0x01;
-        else
-            buffer[pos++] = (byte)0x00;
-        if (needs_secure_channel)
-            buffer[pos++] = (byte)0x01;
-        else
-            buffer[pos++] = (byte)0x00;
-        
-        return pos;
-    }
-    
-    /**
-     * This function allows to define or recover a short description of the card.
-     * 
-     * ins: 0x3D 
-     * p1: 0x00 
-     * p2: operation (0x00 to set label, 0x01 to get label)
-     * data: [label_size(1b) | label ] if p2==0x00 else (none) 
-     * return: [label_size(1b) | label ] if p2==0x01 else (none)
-     */
-    private short cardLabel(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
+   private short LogOutAll() {
+       logged_ids = (short) 0x0000; // Nobody is logged in
+       byte i;
+       for (i = (byte) 0; i < MAX_NUM_PINS; i++)
+           if (pins[i] != null)
+               pins[i].reset();
+       
+       return (short)0;
+   }
+   
+   /**
+    * This function returns a 2 byte bit mask of the available PINs that are currently in
+    * use. Each set bit corresponds to an active PIN.
+    * 
+    *  ins: 0x48
+    *  p1: 0x00
+    *  p2: 0x00
+    *  data: none
+    *  return: [RFU(1b) | PIN_mask(1b)]
+    */
+   private short ListPINs(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       // Checking P1 & P2
+       if (buffer[ISO7816.OFFSET_P1] != (byte) 0x00)
+           ISOException.throwIt(SW_INCORRECT_P1);
+       if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       byte expectedBytes = (byte) (buffer[ISO7816.OFFSET_LC]);
+       if (expectedBytes != (short) 2)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       // Build the PIN bit mask
+       short mask = (short) 0x00;
+       short b;
+       for (b = (short) 0; b < MAX_NUM_PINS; b++)
+           if (pins[b] != null)
+               mask |= (short) (((short) 0x01) << b);
+       // Fill the buffer
+       Util.setShort(buffer, (short) 0, mask);
+       // Send response
+       return (short)2;
+   }
+   
+   /**
+    * This function retrieves general information about the Applet running on the smart
+    * card, and useful information about the status of current session such as:
+    *      - applet version (4b)
+    *  
+    *  ins: 0x3C
+    *  p1: 0x00 
+    *  p2: 0x00 
+    *  data: none
+    *  return: [versions(4b) | PIN0-PUK0-PIN1-PUK1 tries (4b) | needs2FA (1b) | is_seeded(1b) | setupDone(1b) | needs_secure_channel(1b)]
+    */
+   private short GetStatus(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       //if (!pins[0].isValidated())
+       //  ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       if (buffer[ISO7816.OFFSET_P1] != (byte) 0x00)
+           ISOException.throwIt(SW_INCORRECT_P1);
+       if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       
+       short pos = (short) 0;
+       buffer[pos++] = (byte) PROTOCOL_MAJOR_VERSION; // Major Card Edge Protocol version n.
+       buffer[pos++] = (byte) PROTOCOL_MINOR_VERSION; // Minor Card Edge Protocol version n.
+       buffer[pos++] = (byte) APPLET_MAJOR_VERSION; // Major Applet version n.
+       buffer[pos++] = (byte) APPLET_MINOR_VERSION; // Minor Applet version n.
+       // PIN/PUK remaining tries available
+       if (setupDone){
+           buffer[pos++] = pins[0].getTriesRemaining();
+           buffer[pos++] = ublk_pins[0].getTriesRemaining();
+           buffer[pos++] = pins[1].getTriesRemaining();
+           buffer[pos++] = ublk_pins[1].getTriesRemaining();
+       } else {
+           buffer[pos++] = (byte) 0;
+           buffer[pos++] = (byte) 0;
+           buffer[pos++] = (byte) 0;
+           buffer[pos++] = (byte) 0;
+       }
+       if (needs_2FA)
+           buffer[pos++] = (byte)0x01;
+       else
+           buffer[pos++] = (byte)0x00;
+       if (bip32_seeded)
+           buffer[pos++] = (byte)0x01;
+       else
+           buffer[pos++] = (byte)0x00;
+       if (setupDone)
+           buffer[pos++] = (byte)0x01;
+       else
+           buffer[pos++] = (byte)0x00;
+       if (needs_secure_channel)
+           buffer[pos++] = (byte)0x01;
+       else
+           buffer[pos++] = (byte)0x00;
+       
+       return pos;
+   }
+   
+   /**
+    * This function allows to define or recover a short description of the card.
+    * 
+    * ins: 0x3D 
+    * p1: 0x00 
+    * p2: operation (0x00 to set label, 0x01 to get label)
+    * data: [label_size(1b) | label ] if p2==0x00 else (none) 
+    * return: [label_size(1b) | label ] if p2==0x01 else (none)
+    */
+   private short cardLabel(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
 
-        byte op = buffer[ISO7816.OFFSET_P2];
-        switch (op) {
-        case 0x00: // set label
-            short bytes_left = Util.makeShort((byte) 0x00,
-                    buffer[ISO7816.OFFSET_LC]);
-            short buffer_offset = ISO7816.OFFSET_CDATA;
-            if (bytes_left > 0) {
-                short label_size = Util.makeShort((byte) 0x00,
-                        buffer[buffer_offset]);
-                if (label_size > bytes_left)
-                    ISOException.throwIt(SW_INVALID_PARAMETER);
-                if (label_size > MAX_CARD_LABEL_SIZE)
-                    ISOException.throwIt(SW_INVALID_PARAMETER);
-                card_label_size = buffer[buffer_offset];
-                bytes_left--;
-                buffer_offset++;
-                Util.arrayCopyNonAtomic(buffer, buffer_offset, card_label,
-                        (short) 0, label_size);
-            } else if (bytes_left == 0) {// reset label
-                card_label_size = (byte) 0x00;
-            }
-            return (short) 0;
+       byte op = buffer[ISO7816.OFFSET_P2];
+       switch (op) {
+       case 0x00: // set label
+           short bytes_left = Util.makeShort((byte) 0x00,
+                   buffer[ISO7816.OFFSET_LC]);
+           short buffer_offset = ISO7816.OFFSET_CDATA;
+           if (bytes_left > 0) {
+               short label_size = Util.makeShort((byte) 0x00,
+                       buffer[buffer_offset]);
+               if (label_size > bytes_left)
+                   ISOException.throwIt(SW_INVALID_PARAMETER);
+               if (label_size > MAX_CARD_LABEL_SIZE)
+                   ISOException.throwIt(SW_INVALID_PARAMETER);
+               card_label_size = buffer[buffer_offset];
+               bytes_left--;
+               buffer_offset++;
+               Util.arrayCopyNonAtomic(buffer, buffer_offset, card_label,
+                       (short) 0, label_size);
+           } else if (bytes_left == 0) {// reset label
+               card_label_size = (byte) 0x00;
+           }
+           return (short) 0;
 
-        case 0x01: // get label
-            buffer[(short) 0] = card_label_size;
-            Util.arrayCopyNonAtomic(card_label, (short) 0, buffer, (short) 1,
-                    card_label_size);
-            return (short) (card_label_size + 1);
+       case 0x01: // get label
+           buffer[(short) 0] = card_label_size;
+           Util.arrayCopyNonAtomic(card_label, (short) 0, buffer, (short) 1,
+                   card_label_size);
+           return (short) (card_label_size + 1);
 
-        default:
-            ISOException.throwIt(SW_INCORRECT_P2);
+       default:
+           ISOException.throwIt(SW_INCORRECT_P2);
 
-        }// end switch()
+       }// end switch()
 
-        return (short) 0;
-    }
+       return (short) 0;
+   }
 
-    
-    /**
-     * This function imports a Bip32 seed to the applet and derives the master key and chain code.
-     * It also derives a second ECC that uniquely authenticates the HDwallet: the authentikey.
-     * Lastly, it derives a 32-bit AES key that is used to encrypt/decrypt Bip32 object stored in secure memory 
-     * If the seed already exists, it is reset if the logged identities allow it.
-     *         
-     * The function returns the x-coordinate of the authentikey, self-signed.
-     * The authentikey full public key can be recovered from the signature.
-     *  
-     *  ins: 0x6C
-     *  p1: seed_size(1b) 
-     *  p2: 0x00 
-     *  data: [seed_data (seed_size)]
-     *  return: [coordx_size(2b) | coordx | sig_size(2b) | sig]
-     */
-    private short importBIP32Seed(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        // if already seeded, must call resetBIP32Seed first!
-        if (bip32_seeded)
-            ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
-        
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        
-        // get seed bytesize (max 64 bytes)
-        byte bip32_seedsize = buffer[ISO7816.OFFSET_P1]; 
-        if (bip32_seedsize <0 || bip32_seedsize>64)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        if (bytesLeft < bip32_seedsize)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);      
-        
-        short offset= (short)ISO7816.OFFSET_CDATA;
-        
-        // derive master key!
-        HmacSha512.computeHmacSha512(BITCOIN_SEED, (short)0, (short)BITCOIN_SEED.length, buffer, offset, (short)bip32_seedsize, recvBuffer, (short)0);
-        bip32_masterkey.setKey(recvBuffer, (short)0); // data must be exactly 32 bytes long
-        bip32_masterchaincode.setKey(recvBuffer, (short)32); // data must be exactly 32 bytes long
-        
-        // bip32 is now seeded
-        bip32_seeded= true;
-        
-        // clear recvBuffer
-        Util.arrayFillNonAtomic(recvBuffer, (short)0, (short)128, (byte)0);
-        
-        // compute the partial authentikey public key...
-        authentikey_public.getW(buffer, (short)1);
-        Util.setShort(buffer, (short)0, BIP32_KEY_SIZE);
-        // self signed public key
-        sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
-        short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2), buffer, (short)(BIP32_KEY_SIZE+4));
-        Util.setShort(buffer, (short)(2+BIP32_KEY_SIZE), sign_size);
-        
-        // return x-coordinate of public key+signature
-        // the client can recover full public-key from the signature or
-        // by guessing the compression value () and verifying the signature... 
-        // buffer= [coordx_size(2) | coordx | sigsize(2) | sig]
-        return (short)(2+BIP32_KEY_SIZE+2+sign_size);
-    }
-    
-    /**
-     * This function resets the Bip32 seed and all derived keys: the master key, chain code, authentikey 
-     * and the 32-bit AES key that is used to encrypt/decrypt Bip32 object stored in secure memory.
-     * If 2FA is enabled, then a hmac code must be provided, based on the 4-byte counter-2FA.
-     *  
-     *  ins: 0x77
-     *  p1: PIN_size 
-     *  p2: 0x00
-     *  data: [PIN | optional-hmac(20b)]
-     *  return: (none)
-     */
-    private short resetBIP32Seed(APDU apdu, byte[] buffer){
-        
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        
-        // check provided PIN
-        byte pin_size= buffer[ISO7816.OFFSET_P1];
-        OwnerPIN pin = pins[(byte)0x00];
-        if (bytesLeft < pin_size)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        if (!CheckPINPolicy(buffer, ISO7816.OFFSET_CDATA, pin_size))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        
-        byte triesRemaining = pin.getTriesRemaining();
-        if (triesRemaining == (byte) 0x00)
-            ISOException.throwIt(SW_IDENTITY_BLOCKED);
-        if (!pin.check(buffer, (short) ISO7816.OFFSET_CDATA, (byte) pin_size)) {
-            LogoutIdentity((byte)0x00);
-            ISOException.throwIt((short)(SW_PIN_FAILED + triesRemaining - 1));
-        }
-        
-        // check if seeded
-        if (!bip32_seeded)
-            ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
-        
-        // check 2FA if required
-        if (needs_2FA){
-            short offset= Util.makeShort((byte)0, ISO7816.OFFSET_CDATA);
-            offset+=pin_size;
-            bytesLeft-= pin_size;
-            if (bytesLeft < (short)20)
-                ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-             
-            // compute hmac(counter_2FA) and compare with value provided 
-            // hmac of 64-bytes msg: ( authentikey-coordx(32b) | 32bytes 0xFF-padding)
-            authentikey_public.getW(recvBuffer, (short)0);
-            Util.arrayFillNonAtomic(recvBuffer, (short)33, (short)32, (byte)0xFF);
-            HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)1, (short)64, recvBuffer, (short)65);
-            if (Util.arrayCompare(buffer, offset, recvBuffer, (short)65, (short)20)!=0)
-                ISOException.throwIt(SW_SIGNATURE_INVALID);
-        }   
-        
-        resetSeed();
-        
-        // after a reset, user is logged out!
-        LogOutAll();
-        return (short)0;
-    }
-    
-    /**
-     * This function returns the authentikey public key (uniquely derived from the Bip32 seed).
-     * The function returns the x-coordinate of the authentikey, self-signed.
-     * The authentikey full public key can be recovered from the signature.
-     * 
-     *  ins: 0x73
-     *  p1: 0x00 
-     *  p2: 0x00 
-     *  data: none
-     *  return: [coordx_size(2b) | coordx | sig_size(2b) | sig]
-     */
-    private short getBIP32AuthentiKey(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        // check whether the seed is initialized
-        if (!bip32_seeded)
-            ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
-        
-        return computeAuthentikey(buffer);
-    }
-    
-    /**
-     * This function returns the authentikey public key.
-     * The function returns the x-coordinate of the authentikey, self-signed.
-     * The authentikey full public key can be recovered from the signature.
-     * 
-     * Compared to getBIP32AuthentiKey(), this method returns the Authentikey even if the card is not seeded.
-     * For SeedKeeper encrypted seed import, we use the authentikey as a Trusted Pubkey for the ECDH key exchange, 
-     * thus the authentikey must be available before the Satochip is seeded. 
-     * Before a seed is available, the authentiey is generated oncard randomly in the constructor
-     * 
-     *  ins: 0xAD
-     *  p1: 0x00 
-     *  p2: 0x00 
-     *  data: none
-     *  return: [coordx_size(2b) | coordx | sig_size(2b) | sig]
-     */
-    private short getAuthentikey(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        return computeAuthentikey(buffer);
-    }
-    
-    private short computeAuthentikey(byte[] buffer){        
-        // compute the partial authentikey public key...
-        authentikey_public.getW(buffer, (short)1);
-        Util.setShort(buffer, (short)0, BIP32_KEY_SIZE);
-        // self signed public key
-        sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
-        short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2), buffer, (short)(BIP32_KEY_SIZE+4));
-        Util.setShort(buffer, (short)(BIP32_KEY_SIZE+2), sign_size);
-        
-        // return x-coordinate of public key+signature
-        // the client can recover full public-key from the signature or
-        // by guessing the compression value () and verifying the signature... 
-        // buffer= [coordx_size(2) | coordx | sigsize(2) | sig]
-        return (short)(BIP32_KEY_SIZE+sign_size+4);
-    }
-    
-    /**
-     * DEPRECATED - Not necessary anymore when recovering the pubkey with ALG_EC_SVDP_DH_PLAIN_XY
-     * A minimalist API is maintained for backward compatibility.
-     * 
-     * This function allows to compute the authentikey pubkey externally and 
-     * store it in the secure memory cache for future use. 
-     * This allows to speed up computation during derivation of non-hardened child.
-     * 
-     * ins: 0x75
-     * p1: 
-     * p2:
-     * data: [coordx_size(2b) | coordx | sig_size(2b) | sig][coordy_size(2b) | coordy]
-     *
-     * returns: none
-     */
-    private short setBIP32AuthentikeyPubkey(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        short pos=0;
-        Util.setShort(buffer, pos, bip32_om.nb_elem_free); // number of slot available 
-        pos += (short) 2;
-        Util.setShort(buffer, pos, bip32_om.nb_elem_used); // number of slot used 
-        pos += (short) 2;
-        return pos;
-    }// end of setBIP32AuthentikeyPubkey
-    
-    /**
-     * The function computes the Bip32 extended key derived from the master key and returns the 
-     * x-coordinate of the public key signed by the authentikey.
-     * Extended key is stored in the chip in a temporary EC key, along with corresponding ACL
-     * Extended key and chaincode is also cached as a Bip32 object in secure memory
-     * 
-     * ins: 0x6D
-     * p1: depth of the extended key (master is depth 0, m/i is depht 1). Max depth is 10
-     * p2: 0x00 (default) or 0xFF (erase all Bip32 objects from secure memory)
-     * p2: option flags:
-     *      0x80: reset the bip32 cache memory
-     *      0x40: optimize non-hardened child derivation
-     *      0x20: TODO flag whether to store (save) key as object (currently by default)?
-     * data: index path from master to extended key (m/i/j/k/...). 4 bytes per index
-     * 
-     * returns: [chaincode(32b) | coordx_size(2b) | coordx | sig_size(2b) | sig | sig_size(2b) | sig2]
-     * 
-     * */
-    private short getBIP32ExtendedKey(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        // check whether the seed is seed is initialized
-        if (!bip32_seeded)
-            ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
-        
-        // input 
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        
-        byte bip32_depth = buffer[ISO7816.OFFSET_P1];
-        if ((bip32_depth < 0) || (bip32_depth > MAX_BIP32_DEPTH) )
-            ISOException.throwIt(SW_INCORRECT_P1);
-        if (bytesLeft < (short)(4*bip32_depth))
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        
-        // P2 option flags
-        byte opts = buffer[ISO7816.OFFSET_P2]; 
-        if ((opts & 0x80)==0x80)
-            bip32_om.reset();
-        
-        // master key data (usefull as parent's data for key derivation)
-        // The method uses a temporary buffer recvBuffer to store the parent and extended key object data:
-        // recvBuffer=[ parent_chain_code (32b) | 0x00 | parent_key (32b) | hash(address)(32b) | current_extended_key(32b) | current_chain_code(32b) | parent_pubkey(65b) | bip32_path(40b)]
-        // hash(address)= [ index(4b) | unused (16b)| crc (4b) | ANTICOLLISIONHASHTMP(4b)| ANTICOLLISIONHASH(4b)]
-        // parent_pubkey(65b)= [compression_byte(1b) | coord_x (32b) | coord_y(32b)]
-        bip32_masterchaincode.getKey(recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE);
-        bip32_masterkey.getKey(recvBuffer,BIP32_OFFSET_PARENT_KEY);         
-        recvBuffer[BIP32_OFFSET_PARENT_SEPARATOR]=0x00; // separator, also facilitate HMAC derivation
-        Util.arrayCopyNonAtomic(buffer, ISO7816.OFFSET_CDATA, recvBuffer, BIP32_OFFSET_PATH, (short)(4*bip32_depth));
-        short parent_base=Bip32ObjectManager.NULL_OFFSET; 
-        
-        // iterate on indexes provided 
-        for (byte i=1; i<=bip32_depth; i++){
-                        
-            //compute SHA of the extended key address up to depth i (only the last bytes are actually used)
-            sha256.reset(); 
-            sha256.doFinal(recvBuffer, BIP32_OFFSET_PATH, (short)(i*4), recvBuffer, BIP32_OFFSET_INDEX);
-            short base=bip32_om.getBaseAddress(recvBuffer,BIP32_OFFSET_COLLISIONHASH);
-            // retrieve object at this address if it exists
-            if (base!=Bip32ObjectManager.NULL_OFFSET){
-                bip32_om.getBytes(recvBuffer, BIP32_OFFSET_COLLISIONHASH, base, (short)0, BIP32_OBJECT_SIZE);
-            }
-            // otherwise, create object if no object was found
-            if (base==Bip32ObjectManager.NULL_OFFSET){
-                
-                // normal or hardened child?
-                byte msb= recvBuffer[(short)(BIP32_OFFSET_PATH+4*(i-1))];
-                if ((msb & 0x80)!=0x80){ // normal child
-                    // we must compute parent's compressed pubkey from privkey
-                    // check if parent's compression byte is available
-                    byte compbyte=0x04;//default
-                    if (parent_base==Bip32ObjectManager.NULL_OFFSET)
-                        compbyte=bip32_master_compbyte;
-                    else
-                        compbyte=bip32_om.getByte(parent_base, (short)(BIP32_OBJECT_SIZE-1));
-                    
-                    // compute coord x from privkey 
-                    bip32_extendedkey.setS(recvBuffer, BIP32_OFFSET_PARENT_KEY, BIP32_KEY_SIZE);
-                    keyAgreement.init(bip32_extendedkey);
-                    
-                    // keyAgreement.generateSecret() recovers X and Y coordinates
-                    keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, recvBuffer, BIP32_OFFSET_PUB); //pubkey in uncompressed form
-                    boolean parity= ((recvBuffer[(short)(BIP32_OFFSET_PUBY+31)]&0x01)==0);
-                    compbyte= (parity)?(byte)0x02:(byte)0x03; 
-                    // save compbyte in parent's object for future use
-                    if (parent_base==Bip32ObjectManager.NULL_OFFSET)
-                        bip32_master_compbyte= compbyte;
-                    else
-                        bip32_om.setByte(parent_base, (short)(BIP32_OBJECT_SIZE-1), compbyte);
-                
-                    // compute HMAC of compressed pubkey + index
-                    recvBuffer[BIP32_OFFSET_PUB]= compbyte;
-                    Util.arrayCopyNonAtomic(recvBuffer, (short)(BIP32_OFFSET_PATH+4*(i-1)), recvBuffer, BIP32_OFFSET_PUBY, (short)4);
-                    HmacSha512.computeHmacSha512(recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE, BIP32_KEY_SIZE, recvBuffer, BIP32_OFFSET_PUB, (short)(1+BIP32_KEY_SIZE+4), recvBuffer, BIP32_OFFSET_CHILD_KEY);
-                }
-                else { // hardened child
-                    recvBuffer[BIP32_KEY_SIZE]= 0x00;
-                    Util.arrayCopyNonAtomic(recvBuffer, (short)(BIP32_OFFSET_PATH+4*(i-1)), recvBuffer, BIP32_OFFSET_INDEX, (short)4);
-                    HmacSha512.computeHmacSha512(recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE, BIP32_KEY_SIZE, recvBuffer, BIP32_OFFSET_PARENT_SEPARATOR, (short)(1+BIP32_KEY_SIZE+4), recvBuffer, BIP32_OFFSET_CHILD_KEY);
-                }
-                
-                // addition with parent_key...
-                // First check that parse256(IL) < SECP256K1_R
-                if(!Biginteger.lessThan(recvBuffer, BIP32_OFFSET_CHILD_KEY, Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_R, BIP32_KEY_SIZE)){
-                    ISOException.throwIt(SW_BIP32_DERIVATION_ERROR);
-                }
-                // add parent_key (mod SECP256K1_R)
-                if(Biginteger.add_carry(recvBuffer, BIP32_OFFSET_CHILD_KEY, recvBuffer, (short) (BIP32_KEY_SIZE+1), BIP32_KEY_SIZE)){
-                    // in case of final carry, we must substract SECP256K1_R
-                    // we have IL<SECP256K1_R and parent_key<SECP256K1_R, so IL+parent_key<2*SECP256K1_R
-                    Biginteger.subtract(recvBuffer, BIP32_OFFSET_CHILD_KEY, Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_R, BIP32_KEY_SIZE); 
-                }else{
-                    // in the unlikely case where SECP256K1_R<=IL+parent_key<2^256
-                    if(!Biginteger.lessThan(recvBuffer, BIP32_OFFSET_CHILD_KEY, Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_R, BIP32_KEY_SIZE)){
-                        Biginteger.subtract(recvBuffer, BIP32_OFFSET_CHILD_KEY, Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_R, BIP32_KEY_SIZE);
-                    }
-                    // check that value is not 0
-                    if(Biginteger.equalZero(recvBuffer, BIP32_OFFSET_CHILD_KEY, BIP32_KEY_SIZE)){
-                        ISOException.throwIt(SW_BIP32_DERIVATION_ERROR);
-                    }
-                }
-                
-                // encrypt privkey & chaincode
-                aes128.init(bip32_encryptkey, Cipher.MODE_ENCRYPT);
-                aes128.doFinal(recvBuffer, BIP32_OFFSET_CHILD_KEY, (short)(2*BIP32_KEY_SIZE), recvBuffer, BIP32_OFFSET_CHILD_KEY);
-                
-                // Update object data
-                recvBuffer[BIP32_OFFSET_PUB]=0x04;
-                // create object 
-                // todo: should we create object for tx keys in last index (since they are usually used only once)?
-                base= bip32_om.createObject(recvBuffer,BIP32_OFFSET_COLLISIONHASH);
-                
-            }//end if (object creation)
+   
+   /**
+    * This function imports a Bip32 seed to the applet and derives the master key and chain code.
+    * It also derives a second ECC that uniquely authenticates the HDwallet: the authentikey.
+    * Lastly, it derives a 32-bit AES key that is used to encrypt/decrypt Bip32 object stored in secure memory 
+    * If the seed already exists, it is reset if the logged identities allow it.
+    *         
+    * The function returns the x-coordinate of the authentikey, self-signed.
+    * The authentikey full public key can be recovered from the signature.
+    *  
+    *  ins: 0x6C
+    *  p1: seed_size(1b) 
+    *  p2: 0x00 
+    *  data: [seed_data (seed_size)]
+    *  return: [coordx_size(2b) | coordx | sig_size(2b) | sig]
+    */
+   private short importBIP32Seed(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       if (buffer[ISO7816.OFFSET_P2] != (byte) 0x00)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       // if already seeded, must call resetBIP32Seed first!
+       if (bip32_seeded)
+           ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
+       
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       
+       // get seed bytesize (max 64 bytes)
+       byte bip32_seedsize = buffer[ISO7816.OFFSET_P1]; 
+       if (bip32_seedsize <0 || bip32_seedsize>64)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       if (bytesLeft < bip32_seedsize)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);      
+       
+       short offset= (short)ISO7816.OFFSET_CDATA;
+       
+       // derive master key!
+       HmacSha512.computeHmacSha512(BITCOIN_SEED, (short)0, (short)BITCOIN_SEED.length, buffer, offset, (short)bip32_seedsize, recvBuffer, (short)0);
+       bip32_masterkey.setKey(recvBuffer, (short)0); // data must be exactly 32 bytes long
+       bip32_masterchaincode.setKey(recvBuffer, (short)32); // data must be exactly 32 bytes long
+       
+       // bip32 is now seeded
+       bip32_seeded= true;
+       
+       // clear recvBuffer
+       Util.arrayFillNonAtomic(recvBuffer, (short)0, (short)128, (byte)0);
+       
+       // compute the partial authentikey public key...
+       authentikey_public.getW(buffer, (short)1);
+       Util.setShort(buffer, (short)0, BIP32_KEY_SIZE);
+       // self signed public key
+       sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
+       short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2), buffer, (short)(BIP32_KEY_SIZE+4));
+       Util.setShort(buffer, (short)(2+BIP32_KEY_SIZE), sign_size);
+       
+       // return x-coordinate of public key+signature
+       // the client can recover full public-key from the signature or
+       // by guessing the compression value () and verifying the signature... 
+       // buffer= [coordx_size(2) | coordx | sigsize(2) | sig]
+       return (short)(2+BIP32_KEY_SIZE+2+sign_size);
+   }
+   
+   /**
+    * This function resets the Bip32 seed and all derived keys: the master key, chain code, authentikey 
+    * and the 32-bit AES key that is used to encrypt/decrypt Bip32 object stored in secure memory.
+    * If 2FA is enabled, then a hmac code must be provided, based on the 4-byte counter-2FA.
+    *  
+    *  ins: 0x77
+    *  p1: PIN_size 
+    *  p2: 0x00
+    *  data: [PIN | optional-hmac(20b)]
+    *  return: (none)
+    */
+   private short resetBIP32Seed(APDU apdu, byte[] buffer){
+       
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       
+       // check provided PIN
+       byte pin_size= buffer[ISO7816.OFFSET_P1];
+       OwnerPIN pin = pins[(byte)0x00];
+       if (bytesLeft < pin_size)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       if (!CheckPINPolicy(buffer, ISO7816.OFFSET_CDATA, pin_size))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       
+       byte triesRemaining = pin.getTriesRemaining();
+       if (triesRemaining == (byte) 0x00)
+           ISOException.throwIt(SW_IDENTITY_BLOCKED);
+       if (!pin.check(buffer, (short) ISO7816.OFFSET_CDATA, (byte) pin_size)) {
+           LogoutIdentity((byte)0x00);
+           ISOException.throwIt((short)(SW_PIN_FAILED + triesRemaining - 1));
+       }
+       
+       // check if seeded
+       if (!bip32_seeded)
+           ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
+       
+       // check 2FA if required
+       if (needs_2FA){
+           short offset= Util.makeShort((byte)0, ISO7816.OFFSET_CDATA);
+           offset+=pin_size;
+           bytesLeft-= pin_size;
+           if (bytesLeft < (short)20)
+               ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
             
-            // at this point, recvBuffer contains a copy of the object related to extended key at depth i
-            // decrypt privkey & chaincode as they are encrypted at this point
-            aes128.init(bip32_encryptkey, Cipher.MODE_DECRYPT);
-            aes128.doFinal(recvBuffer, BIP32_OFFSET_CHILD_KEY, (short)(2*BIP32_KEY_SIZE), recvBuffer, BIP32_OFFSET_CHILD_KEY);
-            // copy privkey & chain code in parent's offset
-            Util.arrayCopyNonAtomic(recvBuffer, BIP32_OFFSET_CHILD_CHAINCODE, recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE, BIP32_KEY_SIZE); // chaincode
-            Util.arrayCopyNonAtomic(recvBuffer, BIP32_OFFSET_CHILD_KEY, recvBuffer, BIP32_OFFSET_PARENT_KEY, BIP32_KEY_SIZE); // extended_key
-            recvBuffer[BIP32_KEY_SIZE]=0x00;
-            
-            // update parent_base for next iteration
-            parent_base=base;           
-        } // end for
-        
-        // at this point, recvBuffer contains a copy of the last extended key 
-        // instantiate elliptic curve with last extended key + copy ACL
-        bip32_extendedkey.setS(recvBuffer, BIP32_OFFSET_PARENT_KEY, BIP32_KEY_SIZE);
-        
-        // save chaincode to buffer then clear recvBuffer
-        Util.arrayCopyNonAtomic(recvBuffer, (short)BIP32_OFFSET_PARENT_CHAINCODE, buffer, (short)0, BIP32_KEY_SIZE); 
-        Util.arrayFillNonAtomic(recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE, BIP32_OFFSET_END, (byte)0);
-                
-        // compute the corresponding partial public key...
-        keyAgreement.init(bip32_extendedkey);
-        keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, buffer, (short)33); //pubkey in uncompressed form
-        Util.setShort(buffer, BIP32_KEY_SIZE, BIP32_KEY_SIZE);
-        
-        // self-sign coordx
-        sigECDSA.init(bip32_extendedkey, Signature.MODE_SIGN);
-        short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2+BIP32_KEY_SIZE), buffer, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+4));
-        Util.setShort(buffer, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+2), sign_size);
-        
-        // coordx signed by authentikey
-        sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
-        short sign_size2= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+sign_size+4), buffer, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+sign_size+6));
-        Util.setShort(buffer, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+sign_size+4), sign_size2);
-        
-        // return x-coordinate of public key+signatures
-        // the client can recover full public-key by guessing the compression value () and verifying the signature... 
-        // buffer=[chaincode(32) | coordx_size(2) | coordx | sign_size(2) | self-sign | sign_size(2) | auth_sign]
-        return (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+sign_size+sign_size2+6);
-        
-    }// end of getBip32ExtendedKey()    
+           // compute hmac(counter_2FA) and compare with value provided 
+           // hmac of 64-bytes msg: ( authentikey-coordx(32b) | 32bytes 0xFF-padding)
+           authentikey_public.getW(recvBuffer, (short)0);
+           Util.arrayFillNonAtomic(recvBuffer, (short)33, (short)32, (byte)0xFF);
+           HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)1, (short)64, recvBuffer, (short)65);
+           if (Util.arrayCompare(buffer, offset, recvBuffer, (short)65, (short)20)!=0)
+               ISOException.throwIt(SW_SIGNATURE_INVALID);
+       }   
+       
+       resetSeed();
+       
+       // after a reset, user is logged out!
+       LogOutAll();
+       return (short)0;
+   }
+   
+   /**
+    * This function returns the authentikey public key (uniquely derived from the Bip32 seed).
+    * The function returns the x-coordinate of the authentikey, self-signed.
+    * The authentikey full public key can be recovered from the signature.
+    * 
+    *  ins: 0x73
+    *  p1: 0x00 
+    *  p2: 0x00 
+    *  data: none
+    *  return: [coordx_size(2b) | coordx | sig_size(2b) | sig]
+    */
+   private short getBIP32AuthentiKey(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       // check whether the seed is initialized
+       if (!bip32_seeded)
+           ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
+       
+       return computeAuthentikey(buffer);
+   }
+   
+   /**
+    * This function returns the authentikey public key.
+    * The function returns the x-coordinate of the authentikey, self-signed.
+    * The authentikey full public key can be recovered from the signature.
+    * 
+    * Compared to getBIP32AuthentiKey(), this method returns the Authentikey even if the card is not seeded.
+    * For SeedKeeper encrypted seed import, we use the authentikey as a Trusted Pubkey for the ECDH key exchange, 
+    * thus the authentikey must be available before the Satochip is seeded. 
+    * Before a seed is available, the authentiey is generated oncard randomly in the constructor
+    * 
+    *  ins: 0xAD
+    *  p1: 0x00 
+    *  p2: 0x00 
+    *  data: none
+    *  return: [coordx_size(2b) | coordx | sig_size(2b) | sig]
+    */
+   private short getAuthentikey(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       return computeAuthentikey(buffer);
+   }
+   
+   private short computeAuthentikey(byte[] buffer){        
+       // compute the partial authentikey public key...
+       authentikey_public.getW(buffer, (short)1);
+       Util.setShort(buffer, (short)0, BIP32_KEY_SIZE);
+       // self signed public key
+       sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
+       short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2), buffer, (short)(BIP32_KEY_SIZE+4));
+       Util.setShort(buffer, (short)(BIP32_KEY_SIZE+2), sign_size);
+       
+       // return x-coordinate of public key+signature
+       // the client can recover full public-key from the signature or
+       // by guessing the compression value () and verifying the signature... 
+       // buffer= [coordx_size(2) | coordx | sigsize(2) | sig]
+       return (short)(BIP32_KEY_SIZE+sign_size+4);
+   }
+   
+   /**
+    * DEPRECATED - Not necessary anymore when recovering the pubkey with ALG_EC_SVDP_DH_PLAIN_XY
+    * A minimalist API is maintained for backward compatibility.
+    * 
+    * This function allows to compute the authentikey pubkey externally and 
+    * store it in the secure memory cache for future use. 
+    * This allows to speed up computation during derivation of non-hardened child.
+    * 
+    * ins: 0x75
+    * p1: 
+    * p2:
+    * data: [coordx_size(2b) | coordx | sig_size(2b) | sig][coordy_size(2b) | coordy]
+    *
+    * returns: none
+    */
+   private short setBIP32AuthentikeyPubkey(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       short pos=0;
+       Util.setShort(buffer, pos, bip32_om.nb_elem_free); // number of slot available 
+       pos += (short) 2;
+       Util.setShort(buffer, pos, bip32_om.nb_elem_used); // number of slot used 
+       pos += (short) 2;
+       return pos;
+   }// end of setBIP32AuthentikeyPubkey
+   
+   /**
+    * The function computes the Bip32 extended key derived from the master key and returns the 
+    * x-coordinate of the public key signed by the authentikey.
+    * Extended key is stored in the chip in a temporary EC key, along with corresponding ACL
+    * Extended key and chaincode is also cached as a Bip32 object in secure memory
+    * 
+    * ins: 0x6D
+    * p1: depth of the extended key (master is depth 0, m/i is depht 1). Max depth is 10
+    * p2: 0x00 (default) or 0xFF (erase all Bip32 objects from secure memory)
+    * p2: option flags:
+    *      0x80: reset the bip32 cache memory
+    *      0x40: optimize non-hardened child derivation
+    *      0x20: TODO flag whether to store (save) key as object (currently by default)?
+    * data: index path from master to extended key (m/i/j/k/...). 4 bytes per index
+    * 
+    * returns: [chaincode(32b) | coordx_size(2b) | coordx | sig_size(2b) | sig | sig_size(2b) | sig2]
+    * 
+    * */
+   private short getBIP32ExtendedKey(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       // check whether the seed is seed is initialized
+       if (!bip32_seeded)
+           ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
+       
+       // input 
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       
+       byte bip32_depth = buffer[ISO7816.OFFSET_P1];
+       if ((bip32_depth < 0) || (bip32_depth > MAX_BIP32_DEPTH) )
+           ISOException.throwIt(SW_INCORRECT_P1);
+       if (bytesLeft < (short)(4*bip32_depth))
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       
+       // P2 option flags
+       byte opts = buffer[ISO7816.OFFSET_P2]; 
+       if ((opts & 0x80)==0x80)
+           bip32_om.reset();
+       
+       // master key data (usefull as parent's data for key derivation)
+       // The method uses a temporary buffer recvBuffer to store the parent and extended key object data:
+       // recvBuffer=[ parent_chain_code (32b) | 0x00 | parent_key (32b) | hash(address)(32b) | current_extended_key(32b) | current_chain_code(32b) | parent_pubkey(65b) | bip32_path(40b)]
+       // hash(address)= [ index(4b) | unused (16b)| crc (4b) | ANTICOLLISIONHASHTMP(4b)| ANTICOLLISIONHASH(4b)]
+       // parent_pubkey(65b)= [compression_byte(1b) | coord_x (32b) | coord_y(32b)]
+       bip32_masterchaincode.getKey(recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE);
+       bip32_masterkey.getKey(recvBuffer,BIP32_OFFSET_PARENT_KEY);         
+       recvBuffer[BIP32_OFFSET_PARENT_SEPARATOR]=0x00; // separator, also facilitate HMAC derivation
+       Util.arrayCopyNonAtomic(buffer, ISO7816.OFFSET_CDATA, recvBuffer, BIP32_OFFSET_PATH, (short)(4*bip32_depth));
+       short parent_base=Bip32ObjectManager.NULL_OFFSET; 
+       
+       // iterate on indexes provided 
+       for (byte i=1; i<=bip32_depth; i++){
+                       
+           //compute SHA of the extended key address up to depth i (only the last bytes are actually used)
+           sha256.reset(); 
+           sha256.doFinal(recvBuffer, BIP32_OFFSET_PATH, (short)(i*4), recvBuffer, BIP32_OFFSET_INDEX);
+           short base=bip32_om.getBaseAddress(recvBuffer,BIP32_OFFSET_COLLISIONHASH);
+           // retrieve object at this address if it exists
+           if (base!=Bip32ObjectManager.NULL_OFFSET){
+               bip32_om.getBytes(recvBuffer, BIP32_OFFSET_COLLISIONHASH, base, (short)0, BIP32_OBJECT_SIZE);
+           }
+           // otherwise, create object if no object was found
+           if (base==Bip32ObjectManager.NULL_OFFSET){
+               
+               // normal or hardened child?
+               byte msb= recvBuffer[(short)(BIP32_OFFSET_PATH+4*(i-1))];
+               if ((msb & 0x80)!=0x80){ // normal child
+                   // we must compute parent's compressed pubkey from privkey
+                   // check if parent's compression byte is available
+                   byte compbyte=0x04;//default
+                   if (parent_base==Bip32ObjectManager.NULL_OFFSET)
+                       compbyte=bip32_master_compbyte;
+                   else
+                       compbyte=bip32_om.getByte(parent_base, (short)(BIP32_OBJECT_SIZE-1));
+                   
+                   // compute coord x from privkey 
+                   bip32_extendedkey.setS(recvBuffer, BIP32_OFFSET_PARENT_KEY, BIP32_KEY_SIZE);
+                   keyAgreement.init(bip32_extendedkey);
+                   
+                   // keyAgreement.generateSecret() recovers X and Y coordinates
+                   keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, recvBuffer, BIP32_OFFSET_PUB); //pubkey in uncompressed form
+                   boolean parity= ((recvBuffer[(short)(BIP32_OFFSET_PUBY+31)]&0x01)==0);
+                   compbyte= (parity)?(byte)0x02:(byte)0x03; 
+                   // save compbyte in parent's object for future use
+                   if (parent_base==Bip32ObjectManager.NULL_OFFSET)
+                       bip32_master_compbyte= compbyte;
+                   else
+                       bip32_om.setByte(parent_base, (short)(BIP32_OBJECT_SIZE-1), compbyte);
+               
+                   // compute HMAC of compressed pubkey + index
+                   recvBuffer[BIP32_OFFSET_PUB]= compbyte;
+                   Util.arrayCopyNonAtomic(recvBuffer, (short)(BIP32_OFFSET_PATH+4*(i-1)), recvBuffer, BIP32_OFFSET_PUBY, (short)4);
+                   HmacSha512.computeHmacSha512(recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE, BIP32_KEY_SIZE, recvBuffer, BIP32_OFFSET_PUB, (short)(1+BIP32_KEY_SIZE+4), recvBuffer, BIP32_OFFSET_CHILD_KEY);
+               }
+               else { // hardened child
+                   recvBuffer[BIP32_KEY_SIZE]= 0x00;
+                   Util.arrayCopyNonAtomic(recvBuffer, (short)(BIP32_OFFSET_PATH+4*(i-1)), recvBuffer, BIP32_OFFSET_INDEX, (short)4);
+                   HmacSha512.computeHmacSha512(recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE, BIP32_KEY_SIZE, recvBuffer, BIP32_OFFSET_PARENT_SEPARATOR, (short)(1+BIP32_KEY_SIZE+4), recvBuffer, BIP32_OFFSET_CHILD_KEY);
+               }
+               
+               // addition with parent_key...
+               // First check that parse256(IL) < SECP256K1_R
+               if(!Biginteger.lessThan(recvBuffer, BIP32_OFFSET_CHILD_KEY, Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_R, BIP32_KEY_SIZE)){
+                   ISOException.throwIt(SW_BIP32_DERIVATION_ERROR);
+               }
+               // add parent_key (mod SECP256K1_R)
+               if(Biginteger.add_carry(recvBuffer, BIP32_OFFSET_CHILD_KEY, recvBuffer, (short) (BIP32_KEY_SIZE+1), BIP32_KEY_SIZE)){
+                   // in case of final carry, we must substract SECP256K1_R
+                   // we have IL<SECP256K1_R and parent_key<SECP256K1_R, so IL+parent_key<2*SECP256K1_R
+                   Biginteger.subtract(recvBuffer, BIP32_OFFSET_CHILD_KEY, Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_R, BIP32_KEY_SIZE); 
+               }else{
+                   // in the unlikely case where SECP256K1_R<=IL+parent_key<2^256
+                   if(!Biginteger.lessThan(recvBuffer, BIP32_OFFSET_CHILD_KEY, Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_R, BIP32_KEY_SIZE)){
+                       Biginteger.subtract(recvBuffer, BIP32_OFFSET_CHILD_KEY, Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_R, BIP32_KEY_SIZE);
+                   }
+                   // check that value is not 0
+                   if(Biginteger.equalZero(recvBuffer, BIP32_OFFSET_CHILD_KEY, BIP32_KEY_SIZE)){
+                       ISOException.throwIt(SW_BIP32_DERIVATION_ERROR);
+                   }
+               }
+               
+               // encrypt privkey & chaincode
+               aes128.init(bip32_encryptkey, Cipher.MODE_ENCRYPT);
+               aes128.doFinal(recvBuffer, BIP32_OFFSET_CHILD_KEY, (short)(2*BIP32_KEY_SIZE), recvBuffer, BIP32_OFFSET_CHILD_KEY);
+               
+               // Update object data
+               recvBuffer[BIP32_OFFSET_PUB]=0x04;
+               // create object 
+               // todo: should we create object for tx keys in last index (since they are usually used only once)?
+               base= bip32_om.createObject(recvBuffer,BIP32_OFFSET_COLLISIONHASH);
+               
+           }//end if (object creation)
+           
+           // at this point, recvBuffer contains a copy of the object related to extended key at depth i
+           // decrypt privkey & chaincode as they are encrypted at this point
+           aes128.init(bip32_encryptkey, Cipher.MODE_DECRYPT);
+           aes128.doFinal(recvBuffer, BIP32_OFFSET_CHILD_KEY, (short)(2*BIP32_KEY_SIZE), recvBuffer, BIP32_OFFSET_CHILD_KEY);
+           // copy privkey & chain code in parent's offset
+           Util.arrayCopyNonAtomic(recvBuffer, BIP32_OFFSET_CHILD_CHAINCODE, recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE, BIP32_KEY_SIZE); // chaincode
+           Util.arrayCopyNonAtomic(recvBuffer, BIP32_OFFSET_CHILD_KEY, recvBuffer, BIP32_OFFSET_PARENT_KEY, BIP32_KEY_SIZE); // extended_key
+           recvBuffer[BIP32_KEY_SIZE]=0x00;
+           
+           // update parent_base for next iteration
+           parent_base=base;           
+       } // end for
+       
+       // at this point, recvBuffer contains a copy of the last extended key 
+       // instantiate elliptic curve with last extended key + copy ACL
+       bip32_extendedkey.setS(recvBuffer, BIP32_OFFSET_PARENT_KEY, BIP32_KEY_SIZE);
+       
+       // save chaincode to buffer then clear recvBuffer
+       Util.arrayCopyNonAtomic(recvBuffer, (short)BIP32_OFFSET_PARENT_CHAINCODE, buffer, (short)0, BIP32_KEY_SIZE); 
+       Util.arrayFillNonAtomic(recvBuffer, BIP32_OFFSET_PARENT_CHAINCODE, BIP32_OFFSET_END, (byte)0);
+               
+       // compute the corresponding partial public key...
+       keyAgreement.init(bip32_extendedkey);
+       keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, buffer, (short)33); //pubkey in uncompressed form
+       Util.setShort(buffer, BIP32_KEY_SIZE, BIP32_KEY_SIZE);
+       
+       // self-sign coordx
+       sigECDSA.init(bip32_extendedkey, Signature.MODE_SIGN);
+       short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2+BIP32_KEY_SIZE), buffer, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+4));
+       Util.setShort(buffer, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+2), sign_size);
+       
+       // coordx signed by authentikey
+       sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
+       short sign_size2= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+sign_size+4), buffer, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+sign_size+6));
+       Util.setShort(buffer, (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+sign_size+4), sign_size2);
+       
+       // return x-coordinate of public key+signatures
+       // the client can recover full public-key by guessing the compression value () and verifying the signature... 
+       // buffer=[chaincode(32) | coordx_size(2) | coordx | sign_size(2) | self-sign | sign_size(2) | auth_sign]
+       return (short)(BIP32_KEY_SIZE+BIP32_KEY_SIZE+sign_size+sign_size2+6);
+       
+   }// end of getBip32ExtendedKey()    
+   
+   /**
+    * DEPRECATED - Not necessary anymore when recovering the pubkey with ALG_EC_SVDP_DH_PLAIN_XY
+    * A minimalist API is maintained for backward compatibility.
+    * 
+    * This function allows to compute an extended pubkey externally and 
+    * store it in the secure BIP32 memory cache for future use. 
+    * This allows to speed up computation during derivation of non-hardened child.
+    * 
+    * ins: 0x74
+    * p1: 
+    * p2:
+    * data: [chaincode(32b) | coordx_size(2b) | coordx | sig_size(2b) | sig | sig_size(2b) | sig2 ]
+    *          [ coordy_size(2b) | coordy]
+    *  returns: none
+    */
+   private short setBIP32ExtendedPubkey(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       short pos=0;
+       Util.setShort(buffer, pos, bip32_om.nb_elem_free); // number of slot available 
+       pos += (short) 2;
+       Util.setShort(buffer, pos, bip32_om.nb_elem_used); // number of slot used 
+       pos += (short) 2;
+       return pos;
+   }// end of setBIP32ExtendedPubkey
+   
+   /**
+    * This function signs Bitcoin message using std or Bip32 extended key
+    *
+    * ins: 0x6E
+    * p1: key number or 0xFF for the last derived Bip32 extended key 
+    * p2: Init-Update-Finalize
+    * data(init): [ full_msg_size(4b) | (option)altcoinSize(1b)-altcoin]
+    * data(update): [chunk_size(2b) | chunk_data]
+    * data(finalize): [chunk_size(2b) | chunk_data | (option)HMAC-2FA(20b)]
+    *  
+    * returns(init/update): none
+    * return(finalize): [sig]
+    *
+    */
+   private short signMessage(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       byte key_nb = buffer[ISO7816.OFFSET_P1];
+       if ( (key_nb!=(byte)0xFF) && ((key_nb < 0)||(key_nb >= MAX_NUM_KEYS)) )
+           ISOException.throwIt(SW_INCORRECT_P1);
+       
+       byte p2= buffer[ISO7816.OFFSET_P2];
+       if (p2 <= (byte) 0x00 || p2 > (byte) 0x03)
+           ISOException.throwIt(SW_INCORRECT_P2);
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       
+       // check whether the seed is initialized
+       if (key_nb==(byte)0xFF && !bip32_seeded)
+           ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
+       
+       short chunk_size, offset, recvOffset;
+       switch(p2){
+           // initialization
+           case OP_INIT: 
+               recvOffset=0;
+               if (bytesLeft<(short)4){
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);}
+               else if (bytesLeft==(short)4){
+                   // copy Btc message header to tmp buffer
+                   Util.arrayCopyNonAtomic(BITCOIN_SIGNED_MESSAGE_HEADER, (short)0, recvBuffer, (short)0, (short)BITCOIN_SIGNED_MESSAGE_HEADER.length);
+                   recvOffset= (short)BITCOIN_SIGNED_MESSAGE_HEADER.length;
+               }
+               else {
+                   //Altcoin msg header from buffer
+                   offset= (short)ISO7816.OFFSET_CDATA;
+                   offset+=4;
+                   byte altcoinSize= buffer[offset];
+                   offset++;
+                   if (bytesLeft!=(short)(5+altcoinSize))
+                       ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+                   recvBuffer[0]= (byte) (altcoinSize+17);
+                   Util.arrayCopyNonAtomic(buffer, offset, recvBuffer, (short)1, (short)altcoinSize);
+                   Util.arrayCopyNonAtomic(BITCOIN_SIGNED_MESSAGE_HEADER, (short)8, recvBuffer, (short)(1+altcoinSize), (short)17); //' Signed Message:\n'
+                   recvOffset= (short) (18+altcoinSize);
+               }
+               
+               // buffer data = [4-byte msg_size]
+               offset= (short)ISO7816.OFFSET_CDATA;
+               recvOffset+= Biginteger.encodeVarInt(buffer, offset, recvBuffer, recvOffset);
+               offset+=4;
+               sha256.reset();
+               sha256.update(recvBuffer, (short) 0, recvOffset);
+               sign_flag= true; // set flag
+               return (short)0;
+           
+           // update (optionnal)
+           case OP_PROCESS: 
+               if (!sign_flag)
+                   ISOException.throwIt(SW_INCORRECT_INITIALIZATION);
+                   
+               // buffer data = [2-byte chunk_size | n-byte message to sign]
+               offset= (short)ISO7816.OFFSET_CDATA;
+               chunk_size=Util.getShort(buffer, offset);
+               offset+=2;
+               sha256.update(buffer, (short) offset, chunk_size);
+               return (short)0;
+           
+           // final
+           case OP_FINALIZE: 
+               if (!sign_flag)
+                   ISOException.throwIt(SW_INCORRECT_INITIALIZATION);
+               
+               // buffer data = [2-byte chunk_size | n-byte message to sign]
+               offset= (short)ISO7816.OFFSET_CDATA;
+               chunk_size=Util.getShort(buffer, offset);
+               offset+=2;
+               bytesLeft-=2;
+               sha256.doFinal(buffer, (short)offset, chunk_size, recvBuffer, (short) 0);
+               sign_flag= false;// reset flag
+               offset+=chunk_size;
+               bytesLeft-=chunk_size;
+               
+               // check 2FA if required
+               if(needs_2FA){
+                   if (bytesLeft<(short)20)
+                       ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+                   // hmac of 64-bytes msg: (sha256(btcheader+msg) | 32bytes 0xBB-padding)
+                   Util.arrayFillNonAtomic(recvBuffer, (short)32, (short)32, (byte)0xBB);
+                   HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)0, (short)64, recvBuffer, (short)64);
+                   if (Util.arrayCompare(buffer, offset, recvBuffer, (short)64, (short)20)!=0)
+                       ISOException.throwIt(SW_SIGNATURE_INVALID);
+               }
+               
+               // set key & sign
+               if (key_nb==(byte)0xFF)
+                   sigECDSA.init(bip32_extendedkey, Signature.MODE_SIGN);
+               else{
+                   Key key= eckeys[key_nb];
+                   // check type and size
+                   if ((key == null) || !key.isInitialized())
+                       ISOException.throwIt(SW_INCORRECT_P1);
+                   if (key.getType() != KeyBuilder.TYPE_EC_FP_PRIVATE)
+                       ISOException.throwIt(SW_INCORRECT_ALG);     
+                   if (key.getSize()!= LENGTH_EC_FP_256)
+                       ISOException.throwIt(SW_INCORRECT_ALG);
+                   sigECDSA.init(key, Signature.MODE_SIGN);
+               }
+               short sign_size= sigECDSA.sign(recvBuffer, (short)0, (short)32, buffer, (short)0);
+               return sign_size;
+               
+       } //end switch  
+       
+       return (short)0;
+   }
     
-    /**
-     * DEPRECATED - Not necessary anymore when recovering the pubkey with ALG_EC_SVDP_DH_PLAIN_XY
-     * A minimalist API is maintained for backward compatibility.
-     * 
-     * This function allows to compute an extended pubkey externally and 
-     * store it in the secure BIP32 memory cache for future use. 
-     * This allows to speed up computation during derivation of non-hardened child.
-     * 
-     * ins: 0x74
-     * p1: 
-     * p2:
-     * data: [chaincode(32b) | coordx_size(2b) | coordx | sig_size(2b) | sig | sig_size(2b) | sig2 ]
-     *          [ coordy_size(2b) | coordy]
-     *  returns: none
-     */
-    private short setBIP32ExtendedPubkey(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        short pos=0;
-        Util.setShort(buffer, pos, bip32_om.nb_elem_free); // number of slot available 
-        pos += (short) 2;
-        Util.setShort(buffer, pos, bip32_om.nb_elem_used); // number of slot used 
-        pos += (short) 2;
-        return pos;
-    }// end of setBIP32ExtendedPubkey
-    
-    /**
-     * This function signs Bitcoin message using std or Bip32 extended key
-     *
-     * ins: 0x6E
-     * p1: key number or 0xFF for the last derived Bip32 extended key 
-     * p2: Init-Update-Finalize
-     * data(init): [ full_msg_size(4b) | (option)altcoinSize(1b)-altcoin]
-     * data(update): [chunk_size(2b) | chunk_data]
-     * data(finalize): [chunk_size(2b) | chunk_data | (option)HMAC-2FA(20b)]
-     *  
-     * returns(init/update): none
-     * return(finalize): [sig]
-     *
-     */
-    private short signMessage(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        byte key_nb = buffer[ISO7816.OFFSET_P1];
-        if ( (key_nb!=(byte)0xFF) && ((key_nb < 0)||(key_nb >= MAX_NUM_KEYS)) )
-            ISOException.throwIt(SW_INCORRECT_P1);
-        
-        byte p2= buffer[ISO7816.OFFSET_P2];
-        if (p2 <= (byte) 0x00 || p2 > (byte) 0x03)
-            ISOException.throwIt(SW_INCORRECT_P2);
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        
-        // check whether the seed is initialized
-        if (key_nb==(byte)0xFF && !bip32_seeded)
-            ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
-        
-        short chunk_size, offset, recvOffset;
-        switch(p2){
-            // initialization
-            case OP_INIT: 
-                recvOffset=0;
-                if (bytesLeft<(short)4){
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);}
-                else if (bytesLeft==(short)4){
-                    // copy Btc message header to tmp buffer
-                    Util.arrayCopyNonAtomic(BITCOIN_SIGNED_MESSAGE_HEADER, (short)0, recvBuffer, (short)0, (short)BITCOIN_SIGNED_MESSAGE_HEADER.length);
-                    recvOffset= (short)BITCOIN_SIGNED_MESSAGE_HEADER.length;
-                }
-                else {
-                    //Altcoin msg header from buffer
-                    offset= (short)ISO7816.OFFSET_CDATA;
-                    offset+=4;
-                    byte altcoinSize= buffer[offset];
-                    offset++;
-                    if (bytesLeft!=(short)(5+altcoinSize))
-                        ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                    recvBuffer[0]= (byte) (altcoinSize+17);
-                    Util.arrayCopyNonAtomic(buffer, offset, recvBuffer, (short)1, (short)altcoinSize);
-                    Util.arrayCopyNonAtomic(BITCOIN_SIGNED_MESSAGE_HEADER, (short)8, recvBuffer, (short)(1+altcoinSize), (short)17); //' Signed Message:\n'
-                    recvOffset= (short) (18+altcoinSize);
-                }
-                
-                // buffer data = [4-byte msg_size]
-                offset= (short)ISO7816.OFFSET_CDATA;
-                recvOffset+= Biginteger.encodeVarInt(buffer, offset, recvBuffer, recvOffset);
-                offset+=4;
-                sha256.reset();
-                sha256.update(recvBuffer, (short) 0, recvOffset);
-                sign_flag= true; // set flag
-                return (short)0;
-            
-            // update (optionnal)
-            case OP_PROCESS: 
-                if (!sign_flag)
-                    ISOException.throwIt(SW_INCORRECT_INITIALIZATION);
-                    
-                // buffer data = [2-byte chunk_size | n-byte message to sign]
-                offset= (short)ISO7816.OFFSET_CDATA;
-                chunk_size=Util.getShort(buffer, offset);
-                offset+=2;
-                sha256.update(buffer, (short) offset, chunk_size);
-                return (short)0;
-            
-            // final
-            case OP_FINALIZE: 
-                if (!sign_flag)
-                    ISOException.throwIt(SW_INCORRECT_INITIALIZATION);
-                
-                // buffer data = [2-byte chunk_size | n-byte message to sign]
-                offset= (short)ISO7816.OFFSET_CDATA;
-                chunk_size=Util.getShort(buffer, offset);
-                offset+=2;
-                bytesLeft-=2;
-                sha256.doFinal(buffer, (short)offset, chunk_size, recvBuffer, (short) 0);
-                sign_flag= false;// reset flag
-                offset+=chunk_size;
-                bytesLeft-=chunk_size;
-                
-                // check 2FA if required
-                if(needs_2FA){
-                    if (bytesLeft<(short)20)
-                        ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                    // hmac of 64-bytes msg: (sha256(btcheader+msg) | 32bytes 0xBB-padding)
-                    Util.arrayFillNonAtomic(recvBuffer, (short)32, (short)32, (byte)0xBB);
-                    HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)0, (short)64, recvBuffer, (short)64);
-                    if (Util.arrayCompare(buffer, offset, recvBuffer, (short)64, (short)20)!=0)
-                        ISOException.throwIt(SW_SIGNATURE_INVALID);
-                }
-                
-                // set key & sign
-                if (key_nb==(byte)0xFF)
-                    sigECDSA.init(bip32_extendedkey, Signature.MODE_SIGN);
-                else{
-                    Key key= eckeys[key_nb];
-                    // check type and size
-                    if ((key == null) || !key.isInitialized())
-                        ISOException.throwIt(SW_INCORRECT_P1);
-                    if (key.getType() != KeyBuilder.TYPE_EC_FP_PRIVATE)
-                        ISOException.throwIt(SW_INCORRECT_ALG);     
-                    if (key.getSize()!= LENGTH_EC_FP_256)
-                        ISOException.throwIt(SW_INCORRECT_ALG);
-                    sigECDSA.init(key, Signature.MODE_SIGN);
-                }
-                short sign_size= sigECDSA.sign(recvBuffer, (short)0, (short)32, buffer, (short)0);
-                return sign_size;
-                
-        } //end switch  
-        
-        return (short)0;
-    }
-     
-    /**
-     * This function parses a raw transaction and returns the corresponding double SHA-256
-     * If the Bip32 seed is initialized, the hash is signed with the authentikey.
-     * 
-     * ins: 0x71
-     * p1: Init or Process 
-     * p2: PARSE_STD ou PARSE_SEGWIT
-     * data: [raw_tx]
-     * 
-     * return: [hash(32b) | needs_confirm(1b) | sig_size(2b) | sig ]
-     *
-     * where:
-     *      needs_confirm is 0x01 if a hmac-sha1 of the hash must be provided for tx signing 
-     */
-    private short ParseTransaction(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);                                       
-  
-        byte p1 = buffer[ISO7816.OFFSET_P1];
-        byte p2 = buffer[ISO7816.OFFSET_P2];
-        short dataOffset = ISO7816.OFFSET_CDATA;
-        short dataRemaining = (short)(buffer[ISO7816.OFFSET_LC] & 0xff);
-        
-        if (p1== OP_INIT){
-            // initialize transaction object
-            Transaction.resetTransaction();
-        }
-        
-        // parse the transaction
-        byte result = Transaction.RESULT_ERROR;
-        if (p2== PARSE_STD){
-             result= Transaction.parseTransaction(buffer, dataOffset, dataRemaining);
-        }else if (p2== PARSE_SEGWIT){
-            result = Transaction.parseSegwitTransaction(buffer, dataOffset, dataRemaining);
-        }
-        if (result == Transaction.RESULT_ERROR) {
-            Transaction.resetTransaction();
-            ISOException.throwIt(ISO7816.SW_WRONG_DATA);
-        }
-        else if (result == Transaction.RESULT_MORE) {
-            
-            short offset = 0;
-            // Transaction context
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_CURRENT_I, buffer, offset, Transaction.SIZEOF_U32);
-            offset += 4;
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_CURRENT_O, buffer, offset, Transaction.SIZEOF_U32);
-            offset += 4;
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_SCRIPT_COORD, buffer, offset, Transaction.SIZEOF_U32);
-            offset += 4;
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_AMOUNT, buffer, offset, Transaction.SIZEOF_AMOUNT);
-            offset += Transaction.SIZEOF_AMOUNT;
-            
-            return offset;
-        }
-        else if (result == Transaction.RESULT_FINISHED) {
-            
-            // check whether 2fa is required (hmac-sha1 of tx hash)
-            short need2fa=(short)0x0000;
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_AMOUNT, transactionData, OFFSET_TRANSACTION_AMOUNT, (short)8);
-            Biginteger.add_carry(transactionData, OFFSET_TRANSACTION_AMOUNT, transactionData, OFFSET_TRANSACTION_TOTAL, (short)8);
-            if (needs_2FA){
-                if (Biginteger.lessThan(data2FA, OFFSET_2FA_LIMIT, transactionData, OFFSET_TRANSACTION_AMOUNT, (short)8)){
-                    need2fa^= HMAC_CHALRESP_2FA; // set msb 
-                }
-            }
-            
-            // store transaction hash (single hash!) in memory 
-            Transaction.digestFull.doFinal(transactionData, (short)0, (short)0, transactionData, OFFSET_TRANSACTION_HASH);
-            // return transaction hash (double hash!) 
-            // the msb bit of hash_size is set to 1 if a Hmac confirmation is required for the tx signature
-            sha256.reset();
-            short hash_size=sha256.doFinal(transactionData, OFFSET_TRANSACTION_HASH, (short)32, buffer, (short)2);
-            Util.setShort(buffer, (short)0, (short)(hash_size+2));
-            Util.setShort(buffer, (short)(2+hash_size), need2fa);
-            short offset = (short)(2+hash_size+2);
-            
-            // hash signed by authentikey
-            sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
-            short sign_size= sigECDSA.sign(buffer, (short)0, offset, buffer, (short)(offset+2));
-            Util.setShort(buffer, offset, sign_size);
-            offset+=(short)(2+sign_size); 
-            
-            // Transaction context 
-            //todo: put this context in other method
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_CURRENT_I, buffer, offset, Transaction.SIZEOF_U32);
-            offset += 4;
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_CURRENT_O, buffer, offset, Transaction.SIZEOF_U32);
-            offset += 4;
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_SCRIPT_COORD, buffer, offset, Transaction.SIZEOF_U32);
-            offset += 4;
-            Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_AMOUNT, buffer, offset, Transaction.SIZEOF_AMOUNT);
-            offset += Transaction.SIZEOF_AMOUNT;
-            
-            // reset data and send result
-            // buffer= [tx_hash(32) | sign_size(2) | signature | tx context(20 - 46)] //deprecated
-            // buffer= [(hash_size+2)(2b) | tx_hash(32b) | need2fa(2b) | sig_size(2b) | sig(sig_size) | txcontext]
-            Transaction.resetTransaction();
-            return offset;
-        }
-        
-        return 0; //should not happen!
-    }
-    
-    /**
-     * This function signs the current hash transaction with a std or the last extended key
-     * The hash provided in the APDU is compared to the version stored inside the chip.
-     * Depending of the total amount in the transaction and the predefined limit, 
-     * a HMAC must be provided as an additional security layer. 
-     * 
-     * ins: 0x6F
-     * p1: key number or 0xFF for the last derived Bip32 extended key  
-     * p2: 0x00
-     * data: [hash(32b) | option: 2FA-flag(2b)|hmac(20b)]
-     * 
-     * return: [sig ]
-     *
-     */
-    private short SignTransaction(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        byte key_nb = buffer[ISO7816.OFFSET_P1];
-        if ( (key_nb!=(byte)0xFF) && ((key_nb < 0) || (key_nb >= MAX_NUM_KEYS)) )
-            ISOException.throwIt(SW_INCORRECT_P1);
-        
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        if (bytesLeft<MessageDigest.LENGTH_SHA_256)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        
-        // check whether the seed is initialized
-        if (key_nb==(byte)0xFF && !bip32_seeded)
-            ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
-        
-        // check doublehash value in buffer with cached singlehash value
-        sha256.reset();
-        sha256.doFinal(transactionData, OFFSET_TRANSACTION_HASH, MessageDigest.LENGTH_SHA_256, recvBuffer, (short)0);
-        if ((byte)0 != Util.arrayCompare(buffer, ISO7816.OFFSET_CDATA, recvBuffer, (short)0, MessageDigest.LENGTH_SHA_256))
-            ISOException.throwIt(SW_INCORRECT_TXHASH);
-        
-        // check challenge-response answer if necessary
-        if(needs_2FA){
-            if( Biginteger.lessThan(data2FA, OFFSET_2FA_LIMIT, transactionData, OFFSET_TRANSACTION_AMOUNT, (short)8)){
-                if (bytesLeft<MessageDigest.LENGTH_SHA_256+MessageDigest.LENGTH_SHA+(short)2)
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                // check flag for 2fa_hmac_chalresp
-                short hmac_flags= Util.getShort(buffer, (short)(ISO7816.OFFSET_CDATA+32));
-                if (hmac_flags!=HMAC_CHALRESP_2FA)
-                    ISOException.throwIt(SW_INCORRECT_ALG);
-                // hmac of 64-bytes msg: (doublesha256(raw_tx) | 32bytes zero-padding)
-                Util.arrayFillNonAtomic(recvBuffer, (short)32, (short)32, (byte)0x00);
-                HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)0, (short)64, recvBuffer, (short)64);
-                if (Util.arrayCompare(buffer, (short)(ISO7816.OFFSET_CDATA+32+2), recvBuffer, (short)64, (short)20)!=0)
-                    ISOException.throwIt(SW_SIGNATURE_INVALID);
-                // reset total amount
-                Util.arrayFillNonAtomic(transactionData, OFFSET_TRANSACTION_TOTAL, (short)8, (byte)0x00);
-            }
-            else{                   
-                //update total amount
-                Util.arrayCopyNonAtomic(transactionData, OFFSET_TRANSACTION_AMOUNT, transactionData, OFFSET_TRANSACTION_TOTAL, (short)8);
-            }
-        }
-        
-        // hash+sign singlehash
-        if (key_nb==(byte)0xFF)
-            sigECDSA.init(bip32_extendedkey, Signature.MODE_SIGN);
-        else{
-            Key key= eckeys[key_nb];
-            // check type and size
-            if ((key == null) || !key.isInitialized())
-                ISOException.throwIt(SW_INCORRECT_P1);
-            if (key.getType() != KeyBuilder.TYPE_EC_FP_PRIVATE)
-                ISOException.throwIt(SW_INCORRECT_ALG);     
-            if (key.getSize()!= LENGTH_EC_FP_256)
-                ISOException.throwIt(SW_INCORRECT_ALG);
-            sigECDSA.init(key, Signature.MODE_SIGN);
-        }
-        short sign_size= sigECDSA.sign(transactionData, OFFSET_TRANSACTION_HASH, (short)32, buffer, (short)0);
-        return sign_size;
-    }
-    
-    
-    /**
-     * This function signs a given transaction hash with a std or the last extended key
-     * If 2FA is enabled, a HMAC must be provided as an additional security layer. 
-     * 
-     * ins: 0x7A
-     * p1: key number or 0xFF for the last derived Bip32 extended key  
-     * p2: 0x00
-     * data: [hash(32b) | option: 2FA-flag(2b)|hmac(20b)]
-     * 
-     * return: [sig ]
-     * 
-     */
-    private short SignTransactionHash(APDU apdu, byte[] buffer){
-        
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        byte key_nb = buffer[ISO7816.OFFSET_P1];
-        if ( (key_nb!=(byte)0xFF) && ((key_nb < 0) || (key_nb >= MAX_NUM_KEYS)) )
-            ISOException.throwIt(SW_INCORRECT_P1);
-        
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        if (bytesLeft<MessageDigest.LENGTH_SHA_256)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        
-        // check whether the seed is initialized
-        if (key_nb==(byte)0xFF && !bip32_seeded)
-            ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
-        
-        // check 2FA if required
-        if(needs_2FA){
-            // check data length
-            if (bytesLeft<MessageDigest.LENGTH_SHA_256+MessageDigest.LENGTH_SHA+(short)2)
-                ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-            // check flag for 2fa_hmac_chalresp
-            short hmac_flags= Util.getShort(buffer, (short)(ISO7816.OFFSET_CDATA+32));
-            if (hmac_flags!=HMAC_CHALRESP_2FA)
-                ISOException.throwIt(SW_INCORRECT_ALG);
-            // hmac of 64-bytes msg: ( 32bytes tx_hash | 32bytes 0xCC-padding)
-            Util.arrayCopyNonAtomic(buffer, (short)ISO7816.OFFSET_CDATA, recvBuffer, (short)0, (short)32);
-            Util.arrayFillNonAtomic(recvBuffer, (short)32, (short)32, (byte)0xCC);
-            HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)0, (short)64, recvBuffer, (short)64);
-            if (Util.arrayCompare(buffer, (short)(ISO7816.OFFSET_CDATA+32+2), recvBuffer, (short)64, (short)20)!=0)
-                ISOException.throwIt(SW_SIGNATURE_INVALID);
-        }
-        
-        // hash+sign singlehash
-        if (key_nb==(byte)0xFF)
-            sigECDSA.init(bip32_extendedkey, Signature.MODE_SIGN);
-        else{
-            Key key= eckeys[key_nb];
-            // check type and size
-            if ((key == null) || !key.isInitialized())
-                ISOException.throwIt(SW_INCORRECT_P1);
-            if (key.getType() != KeyBuilder.TYPE_EC_FP_PRIVATE)
-                ISOException.throwIt(SW_INCORRECT_ALG);     
-            if (key.getSize()!= LENGTH_EC_FP_256)
-                ISOException.throwIt(SW_INCORRECT_ALG);
-            sigECDSA.init(key, Signature.MODE_SIGN);
-        }
-        short sign_size= sigECDSA.signPreComputedHash(buffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, buffer, (short)0);
-        return sign_size;
-    }
-    
-    
-    /**
-     * This function allows to set the 2FA key and enable 2FA.
-     * Once activated, 2FA can only be deactivated when the seed is reset.
-     *  
-     *  ins: 0x79
-     *  p1: 0x00
-     *  p2: 0x00
-     *  data: [hmacsha1_key(20b) | amount_limit(8b)]
-     *  return: (none)
-     */
-    private short set2FAKey(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        // cannot modify an existing 2FA!
-        if (needs_2FA)
-            ISOException.throwIt(SW_2FA_INITIALIZED_KEY);
-        
-        //check input length
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        if (bytesLeft < (short)(20+8))
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        
-//        if (!done_once_2FA){
-//            data2FA= new byte[OFFSET_2FA_SIZE];
-//            randomData = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
-//            aes128_cbc= Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false);
-//            key_2FA= (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
-//            done_once_2FA= true;
-//        }
-        
-        short offset= ISO7816.OFFSET_CDATA;
-        Util.arrayCopyNonAtomic(buffer, offset, data2FA, OFFSET_2FA_HMACKEY, (short)20); 
-        offset+=(short)20;
-        Util.arrayCopyNonAtomic(buffer, offset, data2FA, OFFSET_2FA_LIMIT, (short)8); 
-        offset+=(short)8;
-        // hmac derivation for id_2FA & key_2FA
-        HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, CST_2FA, (short)0, (short)6, data2FA, OFFSET_2FA_ID);
-        HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, CST_2FA, (short)6, (short)7, recvBuffer, (short)0);
-        key_2FA.setKey(recvBuffer,(short)0); // AES-128: 16-bytes key!!
-        needs_2FA= true;    
-        return (short)0;
-    }
-    
-    /**
-     * This function allows to reset the 2FA key and disable 2FA.
-     * Once activated, 2FA can only be deactivated when the seed is reset and all eckeys cleared.
-     *  
-     *  ins: 0x78
-     *  p1: 0x00
-     *  p2: 0x00
-     *  data: [hmacsha1_key(20b)]
-     *  return: (none)
-     */
-    private short reset2FAKey(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        // check length
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        if (bytesLeft < (short)20)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        
-        if (!needs_2FA)
-            ISOException.throwIt(SW_2FA_UNINITIALIZED_KEY);
-        
-//      // DEPRECATED: reset 2FA can only be done if all private keys are cleared
-//      if (bip32_seeded)
-//          ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
-//      if (eckeys_flag != 0x0000)
-//          ISOException.throwIt(SW_ECKEYS_INITIALIZED_KEY);
-        
-        // compute hmac(2FA_ID) and compare with value provided 
-        // hmac of 64-bytes msg: (id_2FA(20b) | 44 bytes 0xAA-padding)
-        short offset= ISO7816.OFFSET_CDATA;
-        Util.arrayFillNonAtomic(recvBuffer, (short)0, (short)64, (byte)0xAA);
-        Util.arrayCopyNonAtomic(data2FA, OFFSET_2FA_ID, recvBuffer, (short)0, (short)20);
-        HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)0, (short)64, recvBuffer, (short)64);
-        if (Util.arrayCompare(buffer, offset, recvBuffer, (short)64, (short)20)!=0)
-            ISOException.throwIt(SW_SIGNATURE_INVALID);
-        
-        // reset flag and data
-        needs_2FA= false;   
-        key_2FA.clearKey();
-        Util.arrayFillNonAtomic(data2FA, (short)0, OFFSET_2FA_SIZE, (byte)0x00);      
-        
-        return (short)0;
-    }
-    
-    /**
-     * This function encrypts/decrypt a given message with a 16bytes secret key derived from the 2FA key.
-     * It also returns an id derived from the 2FA key.
-     * This is used to privately exchange tx data between the hw wallet and the 2FA device.
-     * 
-     * Algorithms: 
-     *      id_2FA is hmac-sha1(secret_2FA, "id_2FA"), 
-     *      key_2FA is hmac-sha1(secret_2FA, "key_2FA"), 
-     *      message encrypted using AES
-     *
-     * ins: 0x76
-     * p1: 0x00 for encryption, 0x01 for decryption  
-     * p2: Init-Update-Finalize
-     * data(init): IF_ENCRYPT: none ELSE: [IV(16b)]
-     * data(update/finalize): [chunk_size(2b) | chunk_data]
-     * 
-     * return(init): IF_ENCRYPT:[IV(16b) | id_2FA(20b)] ELSE: none
-     * return(update/finalize): [chunk_size(2b) | chunk_data]
-     * 
-     *
-     */
-    private short CryptTransaction2FA(APDU apdu, byte[] buffer){
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        // check that 2FA is enabled
-        if (!needs_2FA)
-            ISOException.throwIt(SW_2FA_UNINITIALIZED_KEY);
-        
-        byte ciph_dir = buffer[ISO7816.OFFSET_P1];
-        byte ciph_op = buffer[ISO7816.OFFSET_P2];
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        short dataOffset = ISO7816.OFFSET_CDATA;
-        
-        short IVlength=(short)16;
-        switch(ciph_op){
-            case OP_INIT:
-                if (ciph_dir!=Cipher.MODE_ENCRYPT &&  ciph_dir!=Cipher.MODE_DECRYPT )
-                    ISOException.throwIt(SW_INVALID_PARAMETER);
-                
-                if (ciph_dir==Cipher.MODE_ENCRYPT){
-                    randomData.generateData(buffer,(short)0, IVlength);
-                    aes128_cbc.init(key_2FA, Cipher.MODE_ENCRYPT, buffer, (short)0, IVlength);
-                    Util.arrayCopyNonAtomic(data2FA, OFFSET_2FA_ID, buffer, (short)IVlength, (short)20);
-                    return (short)(IVlength + 20);
-                }
-                if (ciph_dir==Cipher.MODE_DECRYPT){
-                    aes128_cbc.init(key_2FA, Cipher.MODE_DECRYPT, buffer, dataOffset, IVlength);
-                    return (short)0;
-                }
-                break;
-            case OP_PROCESS:
-            case OP_FINALIZE:
-                if (bytesLeft < 2)
-                    ISOException.throwIt(SW_INVALID_PARAMETER); 
-                short size = Util.getShort(buffer, dataOffset);
-                if (bytesLeft < (short) (2 + size))
-                    ISOException.throwIt(SW_INVALID_PARAMETER); 
-                
-                short sizeout=0;
-                if (ciph_op == OP_PROCESS){
-                    sizeout=aes128_cbc.update(buffer, (short) (dataOffset + 2), size, buffer, (short) 2);
-                }
-                else {// ciph_op == OP_FINALIZE
-                    sizeout=aes128_cbc.doFinal(buffer, (short) (dataOffset + 2), size, buffer, (short) 2);
-                }
-                // Also copies the Short size information
-                Util.setShort(buffer,(short)0,  sizeout);
-                return (short) (sizeout + 2);
-                
-            default:
-                ISOException.throwIt(SW_INCORRECT_P2);    
-        } 
-        return (short)0;
-    }    
-    
+   /**
+    * This function parses a raw transaction and returns the corresponding double SHA-256
+    * If the Bip32 seed is initialized, the hash is signed with the authentikey.
+    * 
+    * ins: 0x71
+    * p1: Init or Process 
+    * p2: PARSE_STD ou PARSE_SEGWIT
+    * data: [raw_tx]
+    * 
+    * return: [hash(32b) | needs_confirm(1b) | sig_size(2b) | sig ]
+    *
+    * where:
+    *      needs_confirm is 0x01 if a hmac-sha1 of the hash must be provided for tx signing 
+    */
+   private short ParseTransaction(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);                                       
+ 
+       byte p1 = buffer[ISO7816.OFFSET_P1];
+       byte p2 = buffer[ISO7816.OFFSET_P2];
+       short dataOffset = ISO7816.OFFSET_CDATA;
+       short dataRemaining = (short)(buffer[ISO7816.OFFSET_LC] & 0xff);
+       
+       if (p1== OP_INIT){
+           // initialize transaction object
+           Transaction.resetTransaction();
+       }
+       
+       // parse the transaction
+       byte result = Transaction.RESULT_ERROR;
+       if (p2== PARSE_STD){
+            result= Transaction.parseTransaction(buffer, dataOffset, dataRemaining);
+       }else if (p2== PARSE_SEGWIT){
+           result = Transaction.parseSegwitTransaction(buffer, dataOffset, dataRemaining);
+       }
+       if (result == Transaction.RESULT_ERROR) {
+           Transaction.resetTransaction();
+           ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+       }
+       else if (result == Transaction.RESULT_MORE) {
+           
+           short offset = 0;
+           // Transaction context
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_CURRENT_I, buffer, offset, Transaction.SIZEOF_U32);
+           offset += 4;
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_CURRENT_O, buffer, offset, Transaction.SIZEOF_U32);
+           offset += 4;
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_SCRIPT_COORD, buffer, offset, Transaction.SIZEOF_U32);
+           offset += 4;
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_AMOUNT, buffer, offset, Transaction.SIZEOF_AMOUNT);
+           offset += Transaction.SIZEOF_AMOUNT;
+           
+           return offset;
+       }
+       else if (result == Transaction.RESULT_FINISHED) {
+           
+           // check whether 2fa is required (hmac-sha1 of tx hash)
+           short need2fa=(short)0x0000;
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_AMOUNT, transactionData, OFFSET_TRANSACTION_AMOUNT, (short)8);
+           Biginteger.add_carry(transactionData, OFFSET_TRANSACTION_AMOUNT, transactionData, OFFSET_TRANSACTION_TOTAL, (short)8);
+           if (needs_2FA){
+               if (Biginteger.lessThan(data2FA, OFFSET_2FA_LIMIT, transactionData, OFFSET_TRANSACTION_AMOUNT, (short)8)){
+                   need2fa^= HMAC_CHALRESP_2FA; // set msb 
+               }
+           }
+           
+           // store transaction hash (single hash!) in memory 
+           Transaction.digestFull.doFinal(transactionData, (short)0, (short)0, transactionData, OFFSET_TRANSACTION_HASH);
+           // return transaction hash (double hash!) 
+           // the msb bit of hash_size is set to 1 if a Hmac confirmation is required for the tx signature
+           sha256.reset();
+           short hash_size=sha256.doFinal(transactionData, OFFSET_TRANSACTION_HASH, (short)32, buffer, (short)2);
+           Util.setShort(buffer, (short)0, (short)(hash_size+2));
+           Util.setShort(buffer, (short)(2+hash_size), need2fa);
+           short offset = (short)(2+hash_size+2);
+           
+           // hash signed by authentikey
+           sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
+           short sign_size= sigECDSA.sign(buffer, (short)0, offset, buffer, (short)(offset+2));
+           Util.setShort(buffer, offset, sign_size);
+           offset+=(short)(2+sign_size); 
+           
+           // Transaction context 
+           //todo: put this context in other method
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_CURRENT_I, buffer, offset, Transaction.SIZEOF_U32);
+           offset += 4;
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_CURRENT_O, buffer, offset, Transaction.SIZEOF_U32);
+           offset += 4;
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_SCRIPT_COORD, buffer, offset, Transaction.SIZEOF_U32);
+           offset += 4;
+           Util.arrayCopyNonAtomic(Transaction.ctx, Transaction.TX_AMOUNT, buffer, offset, Transaction.SIZEOF_AMOUNT);
+           offset += Transaction.SIZEOF_AMOUNT;
+           
+           // reset data and send result
+           // buffer= [tx_hash(32) | sign_size(2) | signature | tx context(20 - 46)] //deprecated
+           // buffer= [(hash_size+2)(2b) | tx_hash(32b) | need2fa(2b) | sig_size(2b) | sig(sig_size) | txcontext]
+           Transaction.resetTransaction();
+           return offset;
+       }
+       
+       return 0; //should not happen!
+   }
+   
+   /**
+    * This function signs the current hash transaction with a std or the last extended key
+    * The hash provided in the APDU is compared to the version stored inside the chip.
+    * Depending of the total amount in the transaction and the predefined limit, 
+    * a HMAC must be provided as an additional security layer. 
+    * 
+    * ins: 0x6F
+    * p1: key number or 0xFF for the last derived Bip32 extended key  
+    * p2: 0x00
+    * data: [hash(32b) | option: 2FA-flag(2b)|hmac(20b)]
+    * 
+    * return: [sig ]
+    *
+    */
+   private short SignTransaction(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       byte key_nb = buffer[ISO7816.OFFSET_P1];
+       if ( (key_nb!=(byte)0xFF) && ((key_nb < 0) || (key_nb >= MAX_NUM_KEYS)) )
+           ISOException.throwIt(SW_INCORRECT_P1);
+       
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       if (bytesLeft<MessageDigest.LENGTH_SHA_256)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       
+       // check whether the seed is initialized
+       if (key_nb==(byte)0xFF && !bip32_seeded)
+           ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
+       
+       // check doublehash value in buffer with cached singlehash value
+       sha256.reset();
+       sha256.doFinal(transactionData, OFFSET_TRANSACTION_HASH, MessageDigest.LENGTH_SHA_256, recvBuffer, (short)0);
+       if ((byte)0 != Util.arrayCompare(buffer, ISO7816.OFFSET_CDATA, recvBuffer, (short)0, MessageDigest.LENGTH_SHA_256))
+           ISOException.throwIt(SW_INCORRECT_TXHASH);
+       
+       // check challenge-response answer if necessary
+       if(needs_2FA){
+           if( Biginteger.lessThan(data2FA, OFFSET_2FA_LIMIT, transactionData, OFFSET_TRANSACTION_AMOUNT, (short)8)){
+               if (bytesLeft<MessageDigest.LENGTH_SHA_256+MessageDigest.LENGTH_SHA+(short)2)
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               // check flag for 2fa_hmac_chalresp
+               short hmac_flags= Util.getShort(buffer, (short)(ISO7816.OFFSET_CDATA+32));
+               if (hmac_flags!=HMAC_CHALRESP_2FA)
+                   ISOException.throwIt(SW_INCORRECT_ALG);
+               // hmac of 64-bytes msg: (doublesha256(raw_tx) | 32bytes zero-padding)
+               Util.arrayFillNonAtomic(recvBuffer, (short)32, (short)32, (byte)0x00);
+               HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)0, (short)64, recvBuffer, (short)64);
+               if (Util.arrayCompare(buffer, (short)(ISO7816.OFFSET_CDATA+32+2), recvBuffer, (short)64, (short)20)!=0)
+                   ISOException.throwIt(SW_SIGNATURE_INVALID);
+               // reset total amount
+               Util.arrayFillNonAtomic(transactionData, OFFSET_TRANSACTION_TOTAL, (short)8, (byte)0x00);
+           }
+           else{                   
+               //update total amount
+               Util.arrayCopyNonAtomic(transactionData, OFFSET_TRANSACTION_AMOUNT, transactionData, OFFSET_TRANSACTION_TOTAL, (short)8);
+           }
+       }
+       
+       // hash+sign singlehash
+       if (key_nb==(byte)0xFF)
+           sigECDSA.init(bip32_extendedkey, Signature.MODE_SIGN);
+       else{
+           Key key= eckeys[key_nb];
+           // check type and size
+           if ((key == null) || !key.isInitialized())
+               ISOException.throwIt(SW_INCORRECT_P1);
+           if (key.getType() != KeyBuilder.TYPE_EC_FP_PRIVATE)
+               ISOException.throwIt(SW_INCORRECT_ALG);     
+           if (key.getSize()!= LENGTH_EC_FP_256)
+               ISOException.throwIt(SW_INCORRECT_ALG);
+           sigECDSA.init(key, Signature.MODE_SIGN);
+       }
+       short sign_size= sigECDSA.sign(transactionData, OFFSET_TRANSACTION_HASH, (short)32, buffer, (short)0);
+       return sign_size;
+   }
+   
+   
+   /**
+    * This function signs a given transaction hash with a std or the last extended key
+    * If 2FA is enabled, a HMAC must be provided as an additional security layer. 
+    * 
+    * ins: 0x7A
+    * p1: key number or 0xFF for the last derived Bip32 extended key  
+    * p2: 0x00
+    * data: [hash(32b) | option: 2FA-flag(2b)|hmac(20b)]
+    * 
+    * return: [sig ]
+    * 
+    */
+   private short SignTransactionHash(APDU apdu, byte[] buffer){
+       
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       byte key_nb = buffer[ISO7816.OFFSET_P1];
+       if ( (key_nb!=(byte)0xFF) && ((key_nb < 0) || (key_nb >= MAX_NUM_KEYS)) )
+           ISOException.throwIt(SW_INCORRECT_P1);
+       
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       if (bytesLeft<MessageDigest.LENGTH_SHA_256)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       
+       // check whether the seed is initialized
+       if (key_nb==(byte)0xFF && !bip32_seeded)
+           ISOException.throwIt(SW_BIP32_UNINITIALIZED_SEED);
+       
+       // check 2FA if required
+       if(needs_2FA){
+           // check data length
+           if (bytesLeft<MessageDigest.LENGTH_SHA_256+MessageDigest.LENGTH_SHA+(short)2)
+               ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+           // check flag for 2fa_hmac_chalresp
+           short hmac_flags= Util.getShort(buffer, (short)(ISO7816.OFFSET_CDATA+32));
+           if (hmac_flags!=HMAC_CHALRESP_2FA)
+               ISOException.throwIt(SW_INCORRECT_ALG);
+           // hmac of 64-bytes msg: ( 32bytes tx_hash | 32bytes 0xCC-padding)
+           Util.arrayCopyNonAtomic(buffer, (short)ISO7816.OFFSET_CDATA, recvBuffer, (short)0, (short)32);
+           Util.arrayFillNonAtomic(recvBuffer, (short)32, (short)32, (byte)0xCC);
+           HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)0, (short)64, recvBuffer, (short)64);
+           if (Util.arrayCompare(buffer, (short)(ISO7816.OFFSET_CDATA+32+2), recvBuffer, (short)64, (short)20)!=0)
+               ISOException.throwIt(SW_SIGNATURE_INVALID);
+       }
+       
+       // hash+sign singlehash
+       if (key_nb==(byte)0xFF)
+           sigECDSA.init(bip32_extendedkey, Signature.MODE_SIGN);
+       else{
+           Key key= eckeys[key_nb];
+           // check type and size
+           if ((key == null) || !key.isInitialized())
+               ISOException.throwIt(SW_INCORRECT_P1);
+           if (key.getType() != KeyBuilder.TYPE_EC_FP_PRIVATE)
+               ISOException.throwIt(SW_INCORRECT_ALG);     
+           if (key.getSize()!= LENGTH_EC_FP_256)
+               ISOException.throwIt(SW_INCORRECT_ALG);
+           sigECDSA.init(key, Signature.MODE_SIGN);
+       }
+       short sign_size= sigECDSA.signPreComputedHash(buffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, buffer, (short)0);
+       return sign_size;
+   }
+   
+   
+   /**
+    * This function allows to set the 2FA key and enable 2FA.
+    * Once activated, 2FA can only be deactivated when the seed is reset.
+    *  
+    *  ins: 0x79
+    *  p1: 0x00
+    *  p2: 0x00
+    *  data: [hmacsha1_key(20b) | amount_limit(8b)]
+    *  return: (none)
+    */
+   private short set2FAKey(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       // cannot modify an existing 2FA!
+       if (needs_2FA)
+           ISOException.throwIt(SW_2FA_INITIALIZED_KEY);
+       
+       //check input length
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       if (bytesLeft < (short)(20+8))
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       
+//       if (!done_once_2FA){
+//           data2FA= new byte[OFFSET_2FA_SIZE];
+//           randomData = RandomData.getInstance(RandomData.ALG_SECURE_RANDOM);
+//           aes128_cbc= Cipher.getInstance(Cipher.ALG_AES_BLOCK_128_CBC_NOPAD, false);
+//           key_2FA= (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
+//           done_once_2FA= true;
+//       }
+       
+       short offset= ISO7816.OFFSET_CDATA;
+       Util.arrayCopyNonAtomic(buffer, offset, data2FA, OFFSET_2FA_HMACKEY, (short)20); 
+       offset+=(short)20;
+       Util.arrayCopyNonAtomic(buffer, offset, data2FA, OFFSET_2FA_LIMIT, (short)8); 
+       offset+=(short)8;
+       // hmac derivation for id_2FA & key_2FA
+       HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, CST_2FA, (short)0, (short)6, data2FA, OFFSET_2FA_ID);
+       HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, CST_2FA, (short)6, (short)7, recvBuffer, (short)0);
+       key_2FA.setKey(recvBuffer,(short)0); // AES-128: 16-bytes key!!
+       needs_2FA= true;    
+       return (short)0;
+   }
+   
+   /**
+    * This function allows to reset the 2FA key and disable 2FA.
+    * Once activated, 2FA can only be deactivated when the seed is reset and all eckeys cleared.
+    *  
+    *  ins: 0x78
+    *  p1: 0x00
+    *  p2: 0x00
+    *  data: [hmacsha1_key(20b)]
+    *  return: (none)
+    */
+   private short reset2FAKey(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       // check length
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       if (bytesLeft < (short)20)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       
+       if (!needs_2FA)
+           ISOException.throwIt(SW_2FA_UNINITIALIZED_KEY);
+       
+//     // DEPRECATED: reset 2FA can only be done if all private keys are cleared
+//     if (bip32_seeded)
+//         ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
+//     if (eckeys_flag != 0x0000)
+//         ISOException.throwIt(SW_ECKEYS_INITIALIZED_KEY);
+       
+       // compute hmac(2FA_ID) and compare with value provided 
+       // hmac of 64-bytes msg: (id_2FA(20b) | 44 bytes 0xAA-padding)
+       short offset= ISO7816.OFFSET_CDATA;
+       Util.arrayFillNonAtomic(recvBuffer, (short)0, (short)64, (byte)0xAA);
+       Util.arrayCopyNonAtomic(data2FA, OFFSET_2FA_ID, recvBuffer, (short)0, (short)20);
+       HmacSha160.computeHmacSha160(data2FA, OFFSET_2FA_HMACKEY, (short)20, recvBuffer, (short)0, (short)64, recvBuffer, (short)64);
+       if (Util.arrayCompare(buffer, offset, recvBuffer, (short)64, (short)20)!=0)
+           ISOException.throwIt(SW_SIGNATURE_INVALID);
+       
+       // reset flag and data
+       needs_2FA= false;   
+       key_2FA.clearKey();
+       Util.arrayFillNonAtomic(data2FA, (short)0, OFFSET_2FA_SIZE, (byte)0x00);      
+       
+       return (short)0;
+   }
+   
+   /**
+    * This function encrypts/decrypt a given message with a 16bytes secret key derived from the 2FA key.
+    * It also returns an id derived from the 2FA key.
+    * This is used to privately exchange tx data between the hw wallet and the 2FA device.
+    * 
+    * Algorithms: 
+    *      id_2FA is hmac-sha1(secret_2FA, "id_2FA"), 
+    *      key_2FA is hmac-sha1(secret_2FA, "key_2FA"), 
+    *      message encrypted using AES
+    *
+    * ins: 0x76
+    * p1: 0x00 for encryption, 0x01 for decryption  
+    * p2: Init-Update-Finalize
+    * data(init): IF_ENCRYPT: none ELSE: [IV(16b)]
+    * data(update/finalize): [chunk_size(2b) | chunk_data]
+    * 
+    * return(init): IF_ENCRYPT:[IV(16b) | id_2FA(20b)] ELSE: none
+    * return(update/finalize): [chunk_size(2b) | chunk_data]
+    * 
+    *
+    */
+   private short CryptTransaction2FA(APDU apdu, byte[] buffer){
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       // check that 2FA is enabled
+       if (!needs_2FA)
+           ISOException.throwIt(SW_2FA_UNINITIALIZED_KEY);
+       
+       byte ciph_dir = buffer[ISO7816.OFFSET_P1];
+       byte ciph_op = buffer[ISO7816.OFFSET_P2];
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       short dataOffset = ISO7816.OFFSET_CDATA;
+       
+       short IVlength=(short)16;
+       switch(ciph_op){
+           case OP_INIT:
+               if (ciph_dir!=Cipher.MODE_ENCRYPT &&  ciph_dir!=Cipher.MODE_DECRYPT )
+                   ISOException.throwIt(SW_INVALID_PARAMETER);
+               
+               if (ciph_dir==Cipher.MODE_ENCRYPT){
+                   randomData.generateData(buffer,(short)0, IVlength);
+                   aes128_cbc.init(key_2FA, Cipher.MODE_ENCRYPT, buffer, (short)0, IVlength);
+                   Util.arrayCopyNonAtomic(data2FA, OFFSET_2FA_ID, buffer, (short)IVlength, (short)20);
+                   return (short)(IVlength + 20);
+               }
+               if (ciph_dir==Cipher.MODE_DECRYPT){
+                   aes128_cbc.init(key_2FA, Cipher.MODE_DECRYPT, buffer, dataOffset, IVlength);
+                   return (short)0;
+               }
+               break;
+           case OP_PROCESS:
+           case OP_FINALIZE:
+               if (bytesLeft < 2)
+                   ISOException.throwIt(SW_INVALID_PARAMETER); 
+               short size = Util.getShort(buffer, dataOffset);
+               if (bytesLeft < (short) (2 + size))
+                   ISOException.throwIt(SW_INVALID_PARAMETER); 
+               
+               short sizeout=0;
+               if (ciph_op == OP_PROCESS){
+                   sizeout=aes128_cbc.update(buffer, (short) (dataOffset + 2), size, buffer, (short) 2);
+               }
+               else {// ciph_op == OP_FINALIZE
+                   sizeout=aes128_cbc.doFinal(buffer, (short) (dataOffset + 2), size, buffer, (short) 2);
+               }
+               // Also copies the Short size information
+               Util.setShort(buffer,(short)0,  sizeout);
+               return (short) (sizeout + 2);
+               
+           default:
+               ISOException.throwIt(SW_INCORRECT_P2);    
+       } 
+       return (short)0;
+   }    
+   
 /**
-     * This function imports a trusted pubkey corresponding to a SeedKeeper
-     * authentikey. When importing an encrypted masterseed from a SeedKeeper,
-     * the secret is encrypted using a shared key derived with ECCH using the
-     * authentikeys of the 2 devices as static private keys.
-     * 
-     * ins: 0xAA 
-     * p1: 0x00 
-     * p2: 0x00 
-     * data: [ pubkey_size(2b) | pubkey] 
-     * return: [coordx_size(2b) | coordx | sig_size(2b) | sig]
-     * 
-     */
-    private short importTrustedPubkey(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        // if already seeded, must call resetBIP32Seed first!
-        if (bip32_seeded)
-            ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
+    * This function imports a trusted pubkey corresponding to a SeedKeeper
+    * authentikey. When importing an encrypted masterseed from a SeedKeeper,
+    * the secret is encrypted using a shared key derived with ECCH using the
+    * authentikeys of the 2 devices as static private keys.
+    * 
+    * ins: 0xAA 
+    * p1: 0x00 
+    * p2: 0x00 
+    * data: [ pubkey_size(2b) | pubkey] 
+    * return: [coordx_size(2b) | coordx | sig_size(2b) | sig]
+    * 
+    */
+   private short importTrustedPubkey(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       // if already seeded, must call resetBIP32Seed first!
+       if (bip32_seeded)
+           ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
 
-        short bytes_left = Util.makeShort((byte) 0x00,
-                buffer[ISO7816.OFFSET_LC]);
-        short buffer_offset = ISO7816.OFFSET_CDATA;
-        short pubkey_size = Util.getShort(buffer, buffer_offset);
-        if (pubkey_size != PUBKEY_SIZE) {
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        }
-        if (bytes_left < pubkey_size) {
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        }
-        buffer_offset += 2;
-        if (buffer[buffer_offset] != 0x04) {
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        }
-        Util.arrayCopyNonAtomic(buffer, buffer_offset, trusted_pubkey, (short) 0, PUBKEY_SIZE);
-        is_trusted_pubkey = true;
+       short bytes_left = Util.makeShort((byte) 0x00,
+               buffer[ISO7816.OFFSET_LC]);
+       short buffer_offset = ISO7816.OFFSET_CDATA;
+       short pubkey_size = Util.getShort(buffer, buffer_offset);
+       if (pubkey_size != PUBKEY_SIZE) {
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       }
+       if (bytes_left < pubkey_size) {
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       }
+       buffer_offset += 2;
+       if (buffer[buffer_offset] != 0x04) {
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       }
+       Util.arrayCopyNonAtomic(buffer, buffer_offset, trusted_pubkey, (short) 0, PUBKEY_SIZE);
+       is_trusted_pubkey = true;
 
-        return exportTrustedPubkey(apdu, buffer);
-    }
+       return exportTrustedPubkey(apdu, buffer);
+   }
 
-    /**
-     * This function exports the trusted pubkey corresponding currently stored
-     * in the Satochip. When importing an encrypted masterseed from a
-     * SeedKeeper, the secret is encrypted using a shared key derived with ECCH
-     * using the authentikeys of the 2 devices as static private keys. The
-     * Seedkeeper authentikey must first be imported using importTrustedPubkey()
-     * 
-     * ins: 0xAB 
-     * p1: 0x00 
-     * p2: 0x00 
-     * data: (none) 
-     * return: [pubkey_size(2b) | pubkey | sig_size(2b) | sig]
-     * 
-     */
-    private short exportTrustedPubkey(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        // check that a trusted_pubkey has been defined
-        if (!is_trusted_pubkey)
-            ISOException.throwIt(SW_SECURE_IMPORT_NO_TRUSTEDPUBKEY);
+   /**
+    * This function exports the trusted pubkey corresponding currently stored
+    * in the Satochip. When importing an encrypted masterseed from a
+    * SeedKeeper, the secret is encrypted using a shared key derived with ECCH
+    * using the authentikeys of the 2 devices as static private keys. The
+    * Seedkeeper authentikey must first be imported using importTrustedPubkey()
+    * 
+    * ins: 0xAB 
+    * p1: 0x00 
+    * p2: 0x00 
+    * data: (none) 
+    * return: [pubkey_size(2b) | pubkey | sig_size(2b) | sig]
+    * 
+    */
+   private short exportTrustedPubkey(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       // check that a trusted_pubkey has been defined
+       if (!is_trusted_pubkey)
+           ISOException.throwIt(SW_SECURE_IMPORT_NO_TRUSTEDPUBKEY);
 
-        short buffer_offset = (short) 0;
-        Util.setShort(buffer, buffer_offset, PUBKEY_SIZE);
-        buffer_offset += 2;
-        Util.arrayCopyNonAtomic(trusted_pubkey, (short) 0, buffer, buffer_offset, PUBKEY_SIZE);
-        buffer_offset += PUBKEY_SIZE;
-        // sign with authentikey
-        sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
-        short sign_size = sigECDSA.sign(buffer, (short) 0, buffer_offset, buffer, (short) (buffer_offset + 2));
-        Util.setShort(buffer, buffer_offset, sign_size);
-        buffer_offset += (short) (2 + sign_size);
-        return buffer_offset;
-    }
+       short buffer_offset = (short) 0;
+       Util.setShort(buffer, buffer_offset, PUBKEY_SIZE);
+       buffer_offset += 2;
+       Util.arrayCopyNonAtomic(trusted_pubkey, (short) 0, buffer, buffer_offset, PUBKEY_SIZE);
+       buffer_offset += PUBKEY_SIZE;
+       // sign with authentikey
+       sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
+       short sign_size = sigECDSA.sign(buffer, (short) 0, buffer_offset, buffer, (short) (buffer_offset + 2));
+       Util.setShort(buffer, buffer_offset, sign_size);
+       buffer_offset += (short) (2 + sign_size);
+       return buffer_offset;
+   }
 
-    /**
-     * Deprecated: use importEncryptedSecret() instead.
-     * This function imports a secret in encrypted form from a SeedKeeper device.
-     * 
-     * ins: 0xAC
-     * p1: 0x0 (secure import) 
-     * p2: 0x00 
-     * data: [ header(12b - without label & labelsize) | IV(16b) | encrypted_secret_size(2b) | encrypted_secret | hmac_size(1b) | hmac(20b)] 
-     * return: (see importBip32Seed() )
-     */
-    private short importBIP32EncryptedSeed(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        // if already seeded, must call resetBIP32Seed first!
-        if (bip32_seeded)
-            ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
-        if (!is_trusted_pubkey)
-            ISOException.throwIt(SW_SECURE_IMPORT_NO_TRUSTEDPUBKEY);
+   /**
+    * Deprecated: use importEncryptedSecret() instead.
+    * This function imports a secret in encrypted form from a SeedKeeper device.
+    * 
+    * ins: 0xAC
+    * p1: 0x0 (secure import) 
+    * p2: 0x00 
+    * data: [ header(12b - without label & labelsize) | IV(16b) | encrypted_secret_size(2b) | encrypted_secret | hmac_size(1b) | hmac(20b)] 
+    * return: (see importBip32Seed() )
+    */
+   private short importBIP32EncryptedSeed(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       // if already seeded, must call resetBIP32Seed first!
+       if (bip32_seeded)
+           ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
+       if (!is_trusted_pubkey)
+           ISOException.throwIt(SW_SECURE_IMPORT_NO_TRUSTEDPUBKEY);
 
-        short bytes_left = Util.makeShort((byte) 0x00,
-                buffer[ISO7816.OFFSET_LC]);
-        short buffer_offset = ISO7816.OFFSET_CDATA;
-        short data_size = (short) 0;
-        short dec_size = (short) 0;
+       short bytes_left = Util.makeShort((byte) 0x00,
+               buffer[ISO7816.OFFSET_LC]);
+       short buffer_offset = ISO7816.OFFSET_CDATA;
+       short data_size = (short) 0;
+       short dec_size = (short) 0;
 
-        if (bytes_left < SECRET_HEADER_SIZE)
-            ISOException.throwIt(SW_INVALID_PARAMETER);
+       if (bytes_left < SECRET_HEADER_SIZE)
+           ISOException.throwIt(SW_INVALID_PARAMETER);
 
-        byte type = buffer[buffer_offset];
-        if (type != 0x10)
-            ISOException.throwIt(SW_INVALID_PARAMETER);// can only import a masterseed (16-64bytes random)
-        buffer_offset += SECRET_HEADER_SIZE;
-        bytes_left -= SECRET_HEADER_SIZE;
-//        short label_size = Util.makeShort((byte) 0x00, buffer[buffer_offset]);
-//        if (label_size > MAX_LABEL_SIZE)
-//            ISOException.throwIt(SW_INVALID_PARAMETER);
-//        buffer_offset++;
-//        bytes_left -= SECRET_HEADER_SIZE;
-//        if (bytes_left < label_size)
-//            ISOException.throwIt(SW_INVALID_PARAMETER);
-//        buffer_offset += label_size;
-//        bytes_left -= label_size;
+       byte type = buffer[buffer_offset];
+       if (type != 0x10)
+           ISOException.throwIt(SW_INVALID_PARAMETER);// can only import a masterseed (16-64bytes random)
+       buffer_offset += SECRET_HEADER_SIZE;
+       bytes_left -= SECRET_HEADER_SIZE;
+//       short label_size = Util.makeShort((byte) 0x00, buffer[buffer_offset]);
+//       if (label_size > MAX_LABEL_SIZE)
+//           ISOException.throwIt(SW_INVALID_PARAMETER);
+//       buffer_offset++;
+//       bytes_left -= SECRET_HEADER_SIZE;
+//       if (bytes_left < label_size)
+//           ISOException.throwIt(SW_INVALID_PARAMETER);
+//       buffer_offset += label_size;
+//       bytes_left -= label_size;
 
-        // hash header for mac
-        sha256.reset();
-        sha256.update(buffer, ISO7816.OFFSET_CDATA, (short) (SECRET_HEADER_SIZE));
+       // hash header for mac
+       sha256.reset();
+       sha256.update(buffer, ISO7816.OFFSET_CDATA, (short) (SECRET_HEADER_SIZE));
 
-        // compute shared static key
-        if (bytes_left < SIZE_SC_IV)// IV
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        keyAgreement.init(authentikey_private);
-        keyAgreement.generateSecret(trusted_pubkey, (short)0, (short)65, recvBuffer, (short)0); // pubkey in uncompressed form
-        // derive secret_sessionkey & secret_mackey
-        HmacSha160.computeHmacSha160(recvBuffer, (short)1, (short)32, SECRET_CST_SC, (short)0, (short)6, recvBuffer, (short)33);
-        secret_sc_sessionkey.setKey(recvBuffer, (short)33); // AES-128:
-        // 16-bytes key!!
-        HmacSha160.computeHmacSha160(recvBuffer, (short)1, (short)32, SECRET_CST_SC, (short)6, (short)6, recvBuffer, (short)33);
-        sc_aes128_cbc.init(secret_sc_sessionkey, Cipher.MODE_DECRYPT, buffer, buffer_offset, SIZE_SC_IV);
-        buffer_offset += SIZE_SC_IV;
-        bytes_left -= SIZE_SC_IV;
+       // compute shared static key
+       if (bytes_left < SIZE_SC_IV)// IV
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       keyAgreement.init(authentikey_private);
+       keyAgreement.generateSecret(trusted_pubkey, (short)0, (short)65, recvBuffer, (short)0); // pubkey in uncompressed form
+       // derive secret_sessionkey & secret_mackey
+       HmacSha160.computeHmacSha160(recvBuffer, (short)1, (short)32, SECRET_CST_SC, (short)0, (short)6, recvBuffer, (short)33);
+       secret_sc_sessionkey.setKey(recvBuffer, (short)33); // AES-128:
+       // 16-bytes key!!
+       HmacSha160.computeHmacSha160(recvBuffer, (short)1, (short)32, SECRET_CST_SC, (short)6, (short)6, recvBuffer, (short)33);
+       sc_aes128_cbc.init(secret_sc_sessionkey, Cipher.MODE_DECRYPT, buffer, buffer_offset, SIZE_SC_IV);
+       buffer_offset += SIZE_SC_IV;
+       bytes_left -= SIZE_SC_IV;
 
-        // load the new (sensitive) data
-        data_size = Util.getShort(buffer, buffer_offset);
-        buffer_offset += 2;
-        bytes_left -= 2;
-        if (bytes_left < data_size) {
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        }
+       // load the new (sensitive) data
+       data_size = Util.getShort(buffer, buffer_offset);
+       buffer_offset += 2;
+       bytes_left -= 2;
+       if (bytes_left < data_size) {
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       }
 
-        // hash the ciphertext to check hmac
-        sha256.doFinal(buffer, buffer_offset, data_size, recvBuffer, (short) (53));
-        short hmac_offset = (short) (buffer_offset + data_size);
-        bytes_left -= data_size;
-        if (bytes_left < 1)
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        short hmac_size = buffer[hmac_offset];
-        hmac_offset++;
-        bytes_left--;
-        if (hmac_size != (short) 20 || bytes_left < hmac_size) {
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        }
-        short sign_size = HmacSha160.computeHmacSha160(recvBuffer, (short)33, SIZE_SC_MACKEY, recvBuffer, (short)53, (short)32, recvBuffer, (short)85);
-        if (Util.arrayCompare(buffer, hmac_offset, recvBuffer, (short)(85), (short)20) != (byte)0)
-            ISOException.throwIt(SW_SECURE_IMPORT_WRONG_MAC);
+       // hash the ciphertext to check hmac
+       sha256.doFinal(buffer, buffer_offset, data_size, recvBuffer, (short) (53));
+       short hmac_offset = (short) (buffer_offset + data_size);
+       bytes_left -= data_size;
+       if (bytes_left < 1)
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       short hmac_size = buffer[hmac_offset];
+       hmac_offset++;
+       bytes_left--;
+       if (hmac_size != (short) 20 || bytes_left < hmac_size) {
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       }
+       short sign_size = HmacSha160.computeHmacSha160(recvBuffer, (short)33, SIZE_SC_MACKEY, recvBuffer, (short)53, (short)32, recvBuffer, (short)85);
+       if (Util.arrayCompare(buffer, hmac_offset, recvBuffer, (short)(85), (short)20) != (byte)0)
+           ISOException.throwIt(SW_SECURE_IMPORT_WRONG_MAC);
 
-        // decrypt secret
-        dec_size = sc_aes128_cbc.update(buffer, buffer_offset, data_size, buffer, buffer_offset);
-        // padding
-        short padsize = buffer[ (short)(buffer_offset+dec_size-1) ];
-        data_size = (short)(dec_size-padsize);
-        // hash for fingerprinting
-        sha256.reset();
-        sha256.doFinal(buffer, buffer_offset, data_size, recvBuffer, (short)0);
-        // compare with fingerprint in header
-        if (Util.arrayCompare(buffer, (short)(ISO7816.OFFSET_CDATA + SECRET_OFFSET_FINGERPRINT), recvBuffer, (short)0, SECRET_FINGERPRINT_SIZE) != (byte)0) {
-            ISOException.throwIt(SW_SECURE_IMPORT_WRONG_FINGERPRINT);
-        }
+       // decrypt secret
+       dec_size = sc_aes128_cbc.update(buffer, buffer_offset, data_size, buffer, buffer_offset);
+       // padding
+       short padsize = buffer[ (short)(buffer_offset+dec_size-1) ];
+       data_size = (short)(dec_size-padsize);
+       // hash for fingerprinting
+       sha256.reset();
+       sha256.doFinal(buffer, buffer_offset, data_size, recvBuffer, (short)0);
+       // compare with fingerprint in header
+       if (Util.arrayCompare(buffer, (short)(ISO7816.OFFSET_CDATA + SECRET_OFFSET_FINGERPRINT), recvBuffer, (short)0, SECRET_FINGERPRINT_SIZE) != (byte)0) {
+           ISOException.throwIt(SW_SECURE_IMPORT_WRONG_FINGERPRINT);
+       }
 
-        // rewrite buffer and call the standard method
-        byte bip32_seedsize = buffer[buffer_offset];
-        buffer[ISO7816.OFFSET_LC] = bip32_seedsize;
-        buffer[ISO7816.OFFSET_P1] = bip32_seedsize;
-        Util.arrayCopyNonAtomic(buffer, (short)(buffer_offset+1), buffer, ISO7816.OFFSET_CDATA, bip32_seedsize);
-        return importBIP32Seed(apdu, buffer);
-    }
+       // rewrite buffer and call the standard method
+       byte bip32_seedsize = buffer[buffer_offset];
+       buffer[ISO7816.OFFSET_LC] = bip32_seedsize;
+       buffer[ISO7816.OFFSET_P1] = bip32_seedsize;
+       Util.arrayCopyNonAtomic(buffer, (short)(buffer_offset+1), buffer, ISO7816.OFFSET_CDATA, bip32_seedsize);
+       return importBIP32Seed(apdu, buffer);
+   }
 
-    /**
-     * This function imports a secret in encrypted form from a SeedKeeper device.
-     * Secret can be either a Masterseed or a 2FA secret 
-     * 
-     * ins: 0xAC
-     * p1: 0x0 (secure import) 
-     * p2: 0x00 
-     * data: [ header(12b - without label & labelsize) | IV(16b) | encrypted_secret_size(2b) | encrypted_secret | hmac_size(1b) | hmac(20b)] 
-     * return: (see importBip32Seed() or set2FAKey())
-     */
-    private short importEncryptedSecret(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        // authentikey used for import (and decryption) must be known in advance
-        if (!is_trusted_pubkey)
-            ISOException.throwIt(SW_SECURE_IMPORT_NO_TRUSTEDPUBKEY);
+   /**
+    * This function imports a secret in encrypted form from a SeedKeeper device.
+    * Secret can be either a Masterseed or a 2FA secret 
+    * 
+    * ins: 0xAC
+    * p1: 0x0 (secure import) 
+    * p2: 0x00 
+    * data: [ header(12b - without label & labelsize) | IV(16b) | encrypted_secret_size(2b) | encrypted_secret | hmac_size(1b) | hmac(20b)] 
+    * return: (see importBip32Seed() or set2FAKey())
+    */
+   private short importEncryptedSecret(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       // authentikey used for import (and decryption) must be known in advance
+       if (!is_trusted_pubkey)
+           ISOException.throwIt(SW_SECURE_IMPORT_NO_TRUSTEDPUBKEY);
 
-        short bytes_left = Util.makeShort((byte) 0x00,
-                buffer[ISO7816.OFFSET_LC]);
-        short buffer_offset = ISO7816.OFFSET_CDATA;
-        short data_size = (short) 0;
-        short dec_size = (short) 0;
+       short bytes_left = Util.makeShort((byte) 0x00,
+               buffer[ISO7816.OFFSET_LC]);
+       short buffer_offset = ISO7816.OFFSET_CDATA;
+       short data_size = (short) 0;
+       short dec_size = (short) 0;
 
-        if (bytes_left < SECRET_HEADER_SIZE)
-            ISOException.throwIt(SW_INVALID_PARAMETER);
+       if (bytes_left < SECRET_HEADER_SIZE)
+           ISOException.throwIt(SW_INVALID_PARAMETER);
 
-        byte type = buffer[buffer_offset];
-        if (type == SECRET_TYPE_MASTER_SEED){
-            // if already seeded, must call resetBIP32Seed first!
-            if (bip32_seeded)
-                ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
-        } else if (type == SECRET_TYPE_2FA){
-            // cannot modify an existing 2FA!
-            if (needs_2FA)
-                ISOException.throwIt(SW_2FA_INITIALIZED_KEY);
-        } else {
-            ISOException.throwIt(SW_INVALID_PARAMETER);// can only import a masterseed (16-64bytes random) or 2FA secret
-        }
-        // the header contains other data but they are not useful for a satochip
-        buffer_offset += SECRET_HEADER_SIZE;
-        bytes_left -= SECRET_HEADER_SIZE;
-        
-        // hash header for mac
-        sha256.reset();
-        sha256.update(buffer, ISO7816.OFFSET_CDATA, (short) (SECRET_HEADER_SIZE));
+       byte type = buffer[buffer_offset];
+       if (type == SECRET_TYPE_MASTER_SEED){
+           // if already seeded, must call resetBIP32Seed first!
+           if (bip32_seeded)
+               ISOException.throwIt(SW_BIP32_INITIALIZED_SEED);
+       } else if (type == SECRET_TYPE_2FA){
+           // cannot modify an existing 2FA!
+           if (needs_2FA)
+               ISOException.throwIt(SW_2FA_INITIALIZED_KEY);
+       } else {
+           ISOException.throwIt(SW_INVALID_PARAMETER);// can only import a masterseed (16-64bytes random) or 2FA secret
+       }
+       // the header contains other data but they are not useful for a satochip
+       buffer_offset += SECRET_HEADER_SIZE;
+       bytes_left -= SECRET_HEADER_SIZE;
+       
+       // hash header for mac
+       sha256.reset();
+       sha256.update(buffer, ISO7816.OFFSET_CDATA, (short) (SECRET_HEADER_SIZE));
 
-        // compute shared static key
-        if (bytes_left < SIZE_SC_IV)// IV
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        keyAgreement.init(authentikey_private);
-        keyAgreement.generateSecret(trusted_pubkey, (short)0, (short)65, recvBuffer, (short)0); // pubkey in uncompressed form
-        // derive secret_sessionkey & secret_mackey
-        HmacSha160.computeHmacSha160(recvBuffer, (short)1, (short)32, SECRET_CST_SC, (short)0, (short)6, recvBuffer, (short)33);
-        secret_sc_sessionkey.setKey(recvBuffer, (short)33); // AES-128:
-        // 16-bytes key!!
-        HmacSha160.computeHmacSha160(recvBuffer, (short)1, (short)32, SECRET_CST_SC, (short)6, (short)6, recvBuffer, (short)33);
-        sc_aes128_cbc.init(secret_sc_sessionkey, Cipher.MODE_DECRYPT, buffer, buffer_offset, SIZE_SC_IV);
-        buffer_offset += SIZE_SC_IV;
-        bytes_left -= SIZE_SC_IV;
+       // compute shared static key
+       if (bytes_left < SIZE_SC_IV)// IV
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       keyAgreement.init(authentikey_private);
+       keyAgreement.generateSecret(trusted_pubkey, (short)0, (short)65, recvBuffer, (short)0); // pubkey in uncompressed form
+       // derive secret_sessionkey & secret_mackey
+       HmacSha160.computeHmacSha160(recvBuffer, (short)1, (short)32, SECRET_CST_SC, (short)0, (short)6, recvBuffer, (short)33);
+       secret_sc_sessionkey.setKey(recvBuffer, (short)33); // AES-128:
+       // 16-bytes key!!
+       HmacSha160.computeHmacSha160(recvBuffer, (short)1, (short)32, SECRET_CST_SC, (short)6, (short)6, recvBuffer, (short)33);
+       sc_aes128_cbc.init(secret_sc_sessionkey, Cipher.MODE_DECRYPT, buffer, buffer_offset, SIZE_SC_IV);
+       buffer_offset += SIZE_SC_IV;
+       bytes_left -= SIZE_SC_IV;
 
-        // load the new (sensitive) data
-        data_size = Util.getShort(buffer, buffer_offset);
-        buffer_offset += 2;
-        bytes_left -= 2;
-        if (bytes_left < data_size) {
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        }
+       // load the new (sensitive) data
+       data_size = Util.getShort(buffer, buffer_offset);
+       buffer_offset += 2;
+       bytes_left -= 2;
+       if (bytes_left < data_size) {
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       }
 
-        // hash the ciphertext to check hmac
-        sha256.doFinal(buffer, buffer_offset, data_size, recvBuffer, (short) (53));
-        short hmac_offset = (short) (buffer_offset + data_size);
-        bytes_left -= data_size;
-        if (bytes_left < 1)
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        short hmac_size = buffer[hmac_offset];
-        hmac_offset++;
-        bytes_left--;
-        if (hmac_size != (short) 20 || bytes_left < hmac_size) {
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-        }
-        short sign_size = HmacSha160.computeHmacSha160(recvBuffer, (short)33, SIZE_SC_MACKEY, recvBuffer, (short)53, (short)32, recvBuffer, (short)85);
-        if (Util.arrayCompare(buffer, hmac_offset, recvBuffer, (short)(85), (short)20) != (byte)0)
-            ISOException.throwIt(SW_SECURE_IMPORT_WRONG_MAC);
+       // hash the ciphertext to check hmac
+       sha256.doFinal(buffer, buffer_offset, data_size, recvBuffer, (short) (53));
+       short hmac_offset = (short) (buffer_offset + data_size);
+       bytes_left -= data_size;
+       if (bytes_left < 1)
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       short hmac_size = buffer[hmac_offset];
+       hmac_offset++;
+       bytes_left--;
+       if (hmac_size != (short) 20 || bytes_left < hmac_size) {
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+       }
+       short sign_size = HmacSha160.computeHmacSha160(recvBuffer, (short)33, SIZE_SC_MACKEY, recvBuffer, (short)53, (short)32, recvBuffer, (short)85);
+       if (Util.arrayCompare(buffer, hmac_offset, recvBuffer, (short)(85), (short)20) != (byte)0)
+           ISOException.throwIt(SW_SECURE_IMPORT_WRONG_MAC);
 
-        // decrypt secret
-        dec_size = sc_aes128_cbc.update(buffer, buffer_offset, data_size, buffer, buffer_offset);
-        // padding
-        short padsize = buffer[ (short)(buffer_offset+dec_size-1) ];
-        data_size = (short)(dec_size-padsize);
-        // hash for fingerprinting
-        sha256.reset();
-        sha256.doFinal(buffer, buffer_offset, data_size, recvBuffer, (short)0);
-        // compare with fingerprint in header
-        if (Util.arrayCompare(buffer, (short)(ISO7816.OFFSET_CDATA + SECRET_OFFSET_FINGERPRINT), recvBuffer, (short)0, SECRET_FINGERPRINT_SIZE) != (byte)0) {
-            ISOException.throwIt(SW_SECURE_IMPORT_WRONG_FINGERPRINT);
-        }
+       // decrypt secret
+       dec_size = sc_aes128_cbc.update(buffer, buffer_offset, data_size, buffer, buffer_offset);
+       // padding
+       short padsize = buffer[ (short)(buffer_offset+dec_size-1) ];
+       data_size = (short)(dec_size-padsize);
+       // hash for fingerprinting
+       sha256.reset();
+       sha256.doFinal(buffer, buffer_offset, data_size, recvBuffer, (short)0);
+       // compare with fingerprint in header
+       if (Util.arrayCompare(buffer, (short)(ISO7816.OFFSET_CDATA + SECRET_OFFSET_FINGERPRINT), recvBuffer, (short)0, SECRET_FINGERPRINT_SIZE) != (byte)0) {
+           ISOException.throwIt(SW_SECURE_IMPORT_WRONG_FINGERPRINT);
+       }
+       
+       // rewrite buffer and call the standard import method
+       if (type == SECRET_TYPE_MASTER_SEED){ 
+           byte bip32_seedsize = buffer[buffer_offset];
+           buffer[ISO7816.OFFSET_LC] = bip32_seedsize;
+           buffer[ISO7816.OFFSET_P1] = bip32_seedsize;
+           Util.arrayCopyNonAtomic(buffer, (short)(buffer_offset+1), buffer, ISO7816.OFFSET_CDATA, bip32_seedsize);
+           return importBIP32Seed(apdu, buffer);
+       }
+       else if (type == SECRET_TYPE_2FA){
+           byte size_2FA = buffer[buffer_offset];
+           Util.arrayCopyNonAtomic(buffer, (short)(buffer_offset+1), buffer, ISO7816.OFFSET_CDATA, size_2FA);
+           Util.arrayFillNonAtomic(buffer, (short)(ISO7816.OFFSET_CDATA+size_2FA), (short)8, (byte)0);
+           return set2FAKey(apdu, buffer);
+       }
+       return (short)0;
+   }
+   
+   /**
+    * This function allows to initiate a Secure Channel
+    *  
+    *  ins: 0x81
+    *  p1: 0x00
+    *  p2: 0x00
+    *  data: [client-pubkey(65b)]
+    *  return: [coordx_size(2b) | authentikey-coordx | sig_size(2b) | self-sig | sig2_size(optional) | authentikey-sig(optional)]
+    */
+   private short InitiateSecureChannel(APDU apdu, byte[] buffer){
+       
+       // get client pubkey
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       if (bytesLeft < (short)65)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       if (buffer[ISO7816.OFFSET_CDATA] != (byte)0x04)
+           ISOException.throwIt(SW_INVALID_PARAMETER);
+           
+       // generate a new ephemeral key
+       sc_ephemeralkey.clearKey(); //todo: simply generate new random S param instead?
+       Secp256k1.setCommonCurveParameters(sc_ephemeralkey);// keep public params!
+       randomData.generateData(recvBuffer, (short)0, BIP32_KEY_SIZE);
+       sc_ephemeralkey.setS(recvBuffer, (short)0, BIP32_KEY_SIZE); //random value first
+       
+       // compute the shared secret...
+       keyAgreement.init(sc_ephemeralkey);        
+       keyAgreement.generateSecret(buffer, ISO7816.OFFSET_CDATA, (short) 65, recvBuffer, (short)0); //pubkey in uncompressed form
+       // derive sc_sessionkey & sc_mackey
+       HmacSha160.computeHmacSha160(recvBuffer, (short)1, BIP32_KEY_SIZE, CST_SC, (short)6, (short)6, recvBuffer, (short)33);
+       Util.arrayCopyNonAtomic(recvBuffer, (short)33, sc_buffer, OFFSET_SC_MACKEY, SIZE_SC_MACKEY);
+       HmacSha160.computeHmacSha160(recvBuffer, (short)1, BIP32_KEY_SIZE, CST_SC, (short)0, (short)6, recvBuffer, (short)33);
+       sc_sessionkey.setKey(recvBuffer,(short)33); // AES-128: 16-bytes key!!       
+//     //alternatively: derive session_key (sha256 of coordx)
+//     sha256.reset();
+//     sha256.doFinal(recvBuffer, (short)1, (short)32, recvBuffer, (short) 0);
+//     sc_sessionkey.setKey(recvBuffer,(short)0); // AES-128: 16-bytes key!!
+//     //derive mac_key
+//     sha256.reset();
+//     sha256.doFinal(recvBuffer, (short)0, (short)32, sc_mackey, (short) 0);
+       
+       //reset IV counter
+       Util.arrayFillNonAtomic(sc_buffer, OFFSET_SC_IV, SIZE_SC_IV, (byte) 0);
+       
+       // self signed ephemeral pubkey
+       keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, buffer, (short)1); //pubkey in uncompressed form
+       Util.setShort(buffer, (short)0, BIP32_KEY_SIZE);
+       sigECDSA.init(sc_ephemeralkey, Signature.MODE_SIGN);
+       short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2), buffer, (short)(BIP32_KEY_SIZE+4));
+       Util.setShort(buffer, (short)(BIP32_KEY_SIZE+2), sign_size);
+       
+       // hash signed by authentikey
+       short offset= (short)(2+BIP32_KEY_SIZE+2+sign_size);
+       sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
+       short sign2_size= sigECDSA.sign(buffer, (short)0, offset, buffer, (short)(offset+2));
+       Util.setShort(buffer, offset, sign2_size);
+       offset+=(short)(2+sign2_size); 
+       
+       initialized_secure_channel= true;
+       
+       // return x-coordinate of public key+signature
+       // the client can recover full public-key from the signature or
+       // by guessing the compression value () and verifying the signature... 
+       // buffer= [coordx_size(2) | coordx | sigsize(2) | sig | sig2_size(optional) | sig2(optional)]
+       return offset;
+   }
+   
+   /**
+    * This function allows to decrypt a secure channel message
+    *  
+    *  ins: 0x82
+    *  
+    *  p1: 0x00 (RFU)
+    *  p2: 0x00 (RFU)
+    *  data: [IV(16b) | data_size(2b) | encrypted_command | mac_size(2b) | mac]
+    *  
+    *  return: [decrypted command]
+    *   
+    */
+   private short ProcessSecureChannel(APDU apdu, byte[] buffer){
+       
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       short offset = ISO7816.OFFSET_CDATA;
+       
+       if (!initialized_secure_channel){
+           ISOException.throwIt(SW_SECURE_CHANNEL_UNINITIALIZED);
+       }
+       
+       // check hmac
+       if (bytesLeft<18)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       short sizein = Util.getShort(buffer, (short) (offset+SIZE_SC_IV));
+       if (bytesLeft<(short)(SIZE_SC_IV+2+sizein+2))
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       short sizemac= Util.getShort(buffer, (short) (offset+SIZE_SC_IV+2+sizein));
+       if (sizemac != (short)20)
+           ISOException.throwIt(SW_SECURE_CHANNEL_WRONG_MAC);
+       if (bytesLeft<(short)(SIZE_SC_IV+2+sizein+2+sizemac))
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       HmacSha160.computeHmacSha160(sc_buffer, OFFSET_SC_MACKEY, SIZE_SC_MACKEY, buffer, offset, (short)(SIZE_SC_IV+2+sizein), recvBuffer, (short)0);
+       if ( Util.arrayCompare(recvBuffer, (short)0, buffer, (short)(offset+SIZE_SC_IV+2+sizein+2), (short)20) != (byte)0 )
+           ISOException.throwIt(SW_SECURE_CHANNEL_WRONG_MAC);
+       
+       // process IV
+       // IV received from client should be odd and strictly greater than locally saved IV
+       // IV should be random (the 12 first bytes), never reused (the last 4 bytes counter) and different for send and receive
+       if ((buffer[(short)(offset+SIZE_SC_IV-(short)1)] & (byte)0x01)==0x00)// should be odd
+           ISOException.throwIt(SW_SECURE_CHANNEL_WRONG_IV);
+       if ( !Biginteger.lessThan(sc_buffer, OFFSET_SC_IV_COUNTER, buffer, (short)(offset+SIZE_SC_IV_RANDOM), SIZE_SC_IV_COUNTER ) ) //and greater than local IV
+           ISOException.throwIt(SW_SECURE_CHANNEL_WRONG_IV);
+       // update local IV
+       Util.arrayCopy(buffer, (short)(offset+SIZE_SC_IV_RANDOM), sc_buffer, OFFSET_SC_IV_COUNTER, SIZE_SC_IV_COUNTER);
+       Biginteger.add1_carry(sc_buffer, OFFSET_SC_IV_COUNTER, SIZE_SC_IV_COUNTER);
+       randomData.generateData(sc_buffer, OFFSET_SC_IV_RANDOM, SIZE_SC_IV_RANDOM);
+       sc_aes128_cbc.init(sc_sessionkey, Cipher.MODE_DECRYPT, buffer, offset, SIZE_SC_IV);
+       offset+=SIZE_SC_IV;
+       bytesLeft-=SIZE_SC_IV;
+       
+       //decrypt command
+       offset+=2;
+       bytesLeft-=2;
+       if (bytesLeft<sizein)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       short sizeout=sc_aes128_cbc.doFinal(buffer, offset, sizein, buffer, (short) (0));
+       return sizeout;
+   }
+   
+   /*********************************************
+    *      Methods for PKI personalization      *
+    *********************************************/
+   
+   /**
+    * This function export the ECDSA secp256k1 public key that corresponds to the private key
+    *  
+    *  ins: 
+    *  p1: 0x00
+    *  p2: 0x00 
+    *  data: [none]
+    *  return: [ pubkey (65b) ]
+    */
+   private short export_PKI_pubkey(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       authentikey_public.getW(buffer, (short)0); 
+       return (short)65;
+   }
+   
+   /**
+    * This function is used to self-sign the CSR of the device
+    *  
+    *  ins: 0x94
+    *  p1: 0x00  
+    *  p2: 0x00 
+    *  data: [hash(32b)]
+    *  return: [signature]
+    */
+   private short sign_PKI_CSR(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       if (personalizationDone)
+           ISOException.throwIt(SW_PKI_ALREADY_LOCKED);
+       
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       if (bytesLeft < (short)32)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       
+       sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
+       short sign_size= sigECDSA.signPreComputedHash(buffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, buffer, (short)0);
+       return sign_size;
+   }
+   
+   /**
+    * This function imports the device certificate
+    *  
+    *  ins: 
+    *  p1: 0x00
+    *  p2: Init-Update 
+    *  data(init): [ full_size(2b) ]
+    *  data(update): [chunk_offset(2b) | chunk_size(2b) | chunk_data ]
+    *  return: [none]
+    */
+   private short import_PKI_certificate(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       if (personalizationDone)
+           ISOException.throwIt(SW_PKI_ALREADY_LOCKED);
+       
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       short buffer_offset = (short) (ISO7816.OFFSET_CDATA);
+       
+       byte op = buffer[ISO7816.OFFSET_P2];
+       switch(op){
+           case OP_INIT:
+               if (bytesLeft < (short)2)
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               
+               short new_certificate_size=Util.getShort(buffer, buffer_offset);
+               if (new_certificate_size < 0)
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               if (authentikey_certificate==null){
+                   // create array
+                   authentikey_certificate= new byte[new_certificate_size];
+                   authentikey_certificate_size=new_certificate_size;
+               }else{
+                   if (new_certificate_size>authentikey_certificate.length)
+                       ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+                   authentikey_certificate_size=new_certificate_size;
+               }
+               break;
+               
+           case OP_PROCESS: 
+               if (bytesLeft < (short)4)
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               short chunk_offset= Util.getShort(buffer, buffer_offset);
+               buffer_offset+=2;
+               short chunk_size= Util.getShort(buffer, buffer_offset);
+               buffer_offset+=2;
+               bytesLeft-=4;
+               if (bytesLeft < chunk_size)
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               if ((chunk_offset<0) || (chunk_offset>=authentikey_certificate_size))
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               if (((short)(chunk_offset+chunk_size))>authentikey_certificate_size)
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               
+               Util.arrayCopyNonAtomic(buffer, buffer_offset, authentikey_certificate, chunk_offset, chunk_size);
+               break;
+               
+           default:
+               ISOException.throwIt(SW_INCORRECT_P2);
+       }
+       return (short)0;
+   }
+   
+   /**
+    * This function exports the device certificate
+    *  
+    *  ins: 
+    *  p1: 0x00  
+    *  p2: Init-Update 
+    *  data(init): [ none ]
+    *  return(init): [ full_size(2b) ]
+    *  data(update): [ chunk_offset(2b) | chunk_size(2b) ]
+    *  return(update): [ chunk_data ] 
+    */
+   private short export_PKI_certificate(APDU apdu, byte[] buffer) {
+       // check that PIN[0] has been entered previously
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       byte op = buffer[ISO7816.OFFSET_P2];
+       switch(op){
+           case OP_INIT:
+               Util.setShort(buffer, (short)0, authentikey_certificate_size);
+               return (short)2; 
+               
+           case OP_PROCESS: 
+               short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+               if (bytesLeft < (short)4)
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               
+               short buffer_offset = (short) (ISO7816.OFFSET_CDATA);
+               short chunk_offset= Util.getShort(buffer, buffer_offset);
+               buffer_offset+=2;
+               short chunk_size= Util.getShort(buffer, buffer_offset);
+               
+               if ((chunk_offset<0) || (chunk_offset>=authentikey_certificate_size))
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               if (((short)(chunk_offset+chunk_size))>authentikey_certificate_size)
+                   ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+               Util.arrayCopyNonAtomic(authentikey_certificate, chunk_offset, buffer, (short)0, chunk_size);
+               return chunk_size; 
+               
+           default:
+               ISOException.throwIt(SW_INCORRECT_P2);
+               return (short)0; 
+       }
+   }
+   
+   /**
+    * This function locks the PKI config.
+    * Once it is locked, it is not possible to modify private key, certificate or allowed_card_AID.
+    *  
+    *  ins: 
+    *  p1: 0x00 
+    *  p2: 0x00 
+    *  data: [none]
+    *  return: [none]
+    */
+   private short lock_PKI(APDU apdu, byte[] buffer) {
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       personalizationDone=true;
+       return (short)0;
+   }
+   
+   /**
+    * This function performs a challenge-response to verify the authenticity of the device.
+    * The challenge is made of three parts: 
+    *          - a constant header
+    *          - a 32-byte challenge provided by the requester
+    *          - a 32-byte random nonce generated by the device
+    * The response is the signature over this challenge. 
+    * This signature can be verified with the certificate stored in the device.
+    * 
+    *  ins: 
+    *  p1: 0x00 
+    *  p2: 0x00 
+    *  data: [challenge1(32b)]
+    *  return: [challenge2(32b) | sig_size(2b) | sig]
+    */
+   private short challenge_response_pki(APDU apdu, byte[] buffer) {
+       // todo: require PIN?
+       if (!pins[0].isValidated())
+           ISOException.throwIt(SW_UNAUTHORIZED);
+       
+       short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
+       if (bytesLeft < (short)32)
+           ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+       
+       //copy all data into array
+       short offset=(short)0;
+       Util.arrayCopyNonAtomic(PKI_CHALLENGE_MSG, (short)0, recvBuffer, offset, (short)PKI_CHALLENGE_MSG.length);
+       offset+=PKI_CHALLENGE_MSG.length;
+       randomData.generateData(recvBuffer, offset, (short)32);
+       offset+=(short)32;
+       Util.arrayCopyNonAtomic(buffer, ISO7816.OFFSET_CDATA, recvBuffer, offset, (short)32);
+       offset+=(short)32;
         
-        // rewrite buffer and call the standard import method
-        if (type == SECRET_TYPE_MASTER_SEED){ 
-            byte bip32_seedsize = buffer[buffer_offset];
-            buffer[ISO7816.OFFSET_LC] = bip32_seedsize;
-            buffer[ISO7816.OFFSET_P1] = bip32_seedsize;
-            Util.arrayCopyNonAtomic(buffer, (short)(buffer_offset+1), buffer, ISO7816.OFFSET_CDATA, bip32_seedsize);
-            return importBIP32Seed(apdu, buffer);
-        }
-        else if (type == SECRET_TYPE_2FA){
-            byte size_2FA = buffer[buffer_offset];
-            Util.arrayCopyNonAtomic(buffer, (short)(buffer_offset+1), buffer, ISO7816.OFFSET_CDATA, size_2FA);
-            Util.arrayFillNonAtomic(buffer, (short)(ISO7816.OFFSET_CDATA+size_2FA), (short)8, (byte)0);
-            return set2FAKey(apdu, buffer);
-        }
-        return (short)0;
-    }
-    
-    /**
-     * This function allows to initiate a Secure Channel
-     *  
-     *  ins: 0x81
-     *  p1: 0x00
-     *  p2: 0x00
-     *  data: [client-pubkey(65b)]
-     *  return: [coordx_size(2b) | authentikey-coordx | sig_size(2b) | self-sig | sig2_size(optional) | authentikey-sig(optional)]
-     */
-    private short InitiateSecureChannel(APDU apdu, byte[] buffer){
-        
-        // get client pubkey
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        if (bytesLeft < (short)65)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        if (buffer[ISO7816.OFFSET_CDATA] != (byte)0x04)
-            ISOException.throwIt(SW_INVALID_PARAMETER);
-            
-        // generate a new ephemeral key
-        sc_ephemeralkey.clearKey(); //todo: simply generate new random S param instead?
-        Secp256k1.setCommonCurveParameters(sc_ephemeralkey);// keep public params!
-        randomData.generateData(recvBuffer, (short)0, BIP32_KEY_SIZE);
-        sc_ephemeralkey.setS(recvBuffer, (short)0, BIP32_KEY_SIZE); //random value first
-        
-        // compute the shared secret...
-        keyAgreement.init(sc_ephemeralkey);        
-        keyAgreement.generateSecret(buffer, ISO7816.OFFSET_CDATA, (short) 65, recvBuffer, (short)0); //pubkey in uncompressed form
-        // derive sc_sessionkey & sc_mackey
-        HmacSha160.computeHmacSha160(recvBuffer, (short)1, BIP32_KEY_SIZE, CST_SC, (short)6, (short)6, recvBuffer, (short)33);
-        Util.arrayCopyNonAtomic(recvBuffer, (short)33, sc_buffer, OFFSET_SC_MACKEY, SIZE_SC_MACKEY);
-        HmacSha160.computeHmacSha160(recvBuffer, (short)1, BIP32_KEY_SIZE, CST_SC, (short)0, (short)6, recvBuffer, (short)33);
-        sc_sessionkey.setKey(recvBuffer,(short)33); // AES-128: 16-bytes key!!       
-//      //alternatively: derive session_key (sha256 of coordx)
-//      sha256.reset();
-//      sha256.doFinal(recvBuffer, (short)1, (short)32, recvBuffer, (short) 0);
-//      sc_sessionkey.setKey(recvBuffer,(short)0); // AES-128: 16-bytes key!!
-//      //derive mac_key
-//      sha256.reset();
-//      sha256.doFinal(recvBuffer, (short)0, (short)32, sc_mackey, (short) 0);
-        
-        //reset IV counter
-        Util.arrayFillNonAtomic(sc_buffer, OFFSET_SC_IV, SIZE_SC_IV, (byte) 0);
-        
-        // self signed ephemeral pubkey
-        keyAgreement.generateSecret(Secp256k1.SECP256K1, Secp256k1.OFFSET_SECP256K1_G, (short) 65, buffer, (short)1); //pubkey in uncompressed form
-        Util.setShort(buffer, (short)0, BIP32_KEY_SIZE);
-        sigECDSA.init(sc_ephemeralkey, Signature.MODE_SIGN);
-        short sign_size= sigECDSA.sign(buffer, (short)0, (short)(BIP32_KEY_SIZE+2), buffer, (short)(BIP32_KEY_SIZE+4));
-        Util.setShort(buffer, (short)(BIP32_KEY_SIZE+2), sign_size);
-        
-        // hash signed by authentikey
-        short offset= (short)(2+BIP32_KEY_SIZE+2+sign_size);
-        sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
-        short sign2_size= sigECDSA.sign(buffer, (short)0, offset, buffer, (short)(offset+2));
-        Util.setShort(buffer, offset, sign2_size);
-        offset+=(short)(2+sign2_size); 
-        
-        initialized_secure_channel= true;
-        
-        // return x-coordinate of public key+signature
-        // the client can recover full public-key from the signature or
-        // by guessing the compression value () and verifying the signature... 
-        // buffer= [coordx_size(2) | coordx | sigsize(2) | sig | sig2_size(optional) | sig2(optional)]
-        return offset;
-    }
-    
-    /**
-     * This function allows to decrypt a secure channel message
-     *  
-     *  ins: 0x82
-     *  
-     *  p1: 0x00 (RFU)
-     *  p2: 0x00 (RFU)
-     *  data: [IV(16b) | data_size(2b) | encrypted_command | mac_size(2b) | mac]
-     *  
-     *  return: [decrypted command]
-     *   
-     */
-    private short ProcessSecureChannel(APDU apdu, byte[] buffer){
-        
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        short offset = ISO7816.OFFSET_CDATA;
-        
-        if (!initialized_secure_channel){
-            ISOException.throwIt(SW_SECURE_CHANNEL_UNINITIALIZED);
-        }
-        
-        // check hmac
-        if (bytesLeft<18)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        short sizein = Util.getShort(buffer, (short) (offset+SIZE_SC_IV));
-        if (bytesLeft<(short)(SIZE_SC_IV+2+sizein+2))
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        short sizemac= Util.getShort(buffer, (short) (offset+SIZE_SC_IV+2+sizein));
-        if (sizemac != (short)20)
-            ISOException.throwIt(SW_SECURE_CHANNEL_WRONG_MAC);
-        if (bytesLeft<(short)(SIZE_SC_IV+2+sizein+2+sizemac))
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        HmacSha160.computeHmacSha160(sc_buffer, OFFSET_SC_MACKEY, SIZE_SC_MACKEY, buffer, offset, (short)(SIZE_SC_IV+2+sizein), recvBuffer, (short)0);
-        if ( Util.arrayCompare(recvBuffer, (short)0, buffer, (short)(offset+SIZE_SC_IV+2+sizein+2), (short)20) != (byte)0 )
-            ISOException.throwIt(SW_SECURE_CHANNEL_WRONG_MAC);
-        
-        // process IV
-        // IV received from client should be odd and strictly greater than locally saved IV
-        // IV should be random (the 12 first bytes), never reused (the last 4 bytes counter) and different for send and receive
-        if ((buffer[(short)(offset+SIZE_SC_IV-(short)1)] & (byte)0x01)==0x00)// should be odd
-            ISOException.throwIt(SW_SECURE_CHANNEL_WRONG_IV);
-        if ( !Biginteger.lessThan(sc_buffer, OFFSET_SC_IV_COUNTER, buffer, (short)(offset+SIZE_SC_IV_RANDOM), SIZE_SC_IV_COUNTER ) ) //and greater than local IV
-            ISOException.throwIt(SW_SECURE_CHANNEL_WRONG_IV);
-        // update local IV
-        Util.arrayCopy(buffer, (short)(offset+SIZE_SC_IV_RANDOM), sc_buffer, OFFSET_SC_IV_COUNTER, SIZE_SC_IV_COUNTER);
-        Biginteger.add1_carry(sc_buffer, OFFSET_SC_IV_COUNTER, SIZE_SC_IV_COUNTER);
-        randomData.generateData(sc_buffer, OFFSET_SC_IV_RANDOM, SIZE_SC_IV_RANDOM);
-        sc_aes128_cbc.init(sc_sessionkey, Cipher.MODE_DECRYPT, buffer, offset, SIZE_SC_IV);
-        offset+=SIZE_SC_IV;
-        bytesLeft-=SIZE_SC_IV;
-        
-        //decrypt command
-        offset+=2;
-        bytesLeft-=2;
-        if (bytesLeft<sizein)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        short sizeout=sc_aes128_cbc.doFinal(buffer, offset, sizein, buffer, (short) (0));
-        return sizeout;
-    }
-    
-    /*********************************************
-     *      Methods for PKI personalization      *
-     *********************************************/
-    
-    /**
-     * This function export the ECDSA secp256k1 public key that corresponds to the private key
-     *  
-     *  ins: 
-     *  p1: 0x00
-     *  p2: 0x00 
-     *  data: [none]
-     *  return: [ pubkey (65b) ]
-     */
-    private short export_PKI_pubkey(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        authentikey_public.getW(buffer, (short)0); 
-        return (short)65;
-    }
-    
-    /**
-     * This function is used to self-sign the CSR of the device
-     *  
-     *  ins: 0x94
-     *  p1: 0x00  
-     *  p2: 0x00 
-     *  data: [hash(32b)]
-     *  return: [signature]
-     */
-    private short sign_PKI_CSR(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        if (personalizationDone)
-            ISOException.throwIt(SW_PKI_ALREADY_LOCKED);
-        
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        if (bytesLeft < (short)32)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        
-        sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
-        short sign_size= sigECDSA.signPreComputedHash(buffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, buffer, (short)0);
-        return sign_size;
-    }
-    
-    /**
-     * This function imports the device certificate
-     *  
-     *  ins: 
-     *  p1: 0x00
-     *  p2: Init-Update 
-     *  data(init): [ full_size(2b) ]
-     *  data(update): [chunk_offset(2b) | chunk_size(2b) | chunk_data ]
-     *  return: [none]
-     */
-    private short import_PKI_certificate(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        if (personalizationDone)
-            ISOException.throwIt(SW_PKI_ALREADY_LOCKED);
-        
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        short buffer_offset = (short) (ISO7816.OFFSET_CDATA);
-        
-        byte op = buffer[ISO7816.OFFSET_P2];
-        switch(op){
-            case OP_INIT:
-                if (bytesLeft < (short)2)
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                
-                short new_certificate_size=Util.getShort(buffer, buffer_offset);
-                if (new_certificate_size < 0)
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                if (authentikey_certificate==null){
-                    // create array
-                    authentikey_certificate= new byte[new_certificate_size];
-                    authentikey_certificate_size=new_certificate_size;
-                }else{
-                    if (new_certificate_size>authentikey_certificate.length)
-                        ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                    authentikey_certificate_size=new_certificate_size;
-                }
-                break;
-                
-            case OP_PROCESS: 
-                if (bytesLeft < (short)4)
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                short chunk_offset= Util.getShort(buffer, buffer_offset);
-                buffer_offset+=2;
-                short chunk_size= Util.getShort(buffer, buffer_offset);
-                buffer_offset+=2;
-                bytesLeft-=4;
-                if (bytesLeft < chunk_size)
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                if ((chunk_offset<0) || (chunk_offset>=authentikey_certificate_size))
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                if (((short)(chunk_offset+chunk_size))>authentikey_certificate_size)
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                
-                Util.arrayCopyNonAtomic(buffer, buffer_offset, authentikey_certificate, chunk_offset, chunk_size);
-                break;
-                
-            default:
-                ISOException.throwIt(SW_INCORRECT_P2);
-        }
-        return (short)0;
-    }
-    
-    /**
-     * This function exports the device certificate
-     *  
-     *  ins: 
-     *  p1: 0x00  
-     *  p2: Init-Update 
-     *  data(init): [ none ]
-     *  return(init): [ full_size(2b) ]
-     *  data(update): [ chunk_offset(2b) | chunk_size(2b) ]
-     *  return(update): [ chunk_data ] 
-     */
-    private short export_PKI_certificate(APDU apdu, byte[] buffer) {
-        // check that PIN[0] has been entered previously
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        byte op = buffer[ISO7816.OFFSET_P2];
-        switch(op){
-            case OP_INIT:
-                Util.setShort(buffer, (short)0, authentikey_certificate_size);
-                return (short)2; 
-                
-            case OP_PROCESS: 
-                short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-                if (bytesLeft < (short)4)
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                
-                short buffer_offset = (short) (ISO7816.OFFSET_CDATA);
-                short chunk_offset= Util.getShort(buffer, buffer_offset);
-                buffer_offset+=2;
-                short chunk_size= Util.getShort(buffer, buffer_offset);
-                
-                if ((chunk_offset<0) || (chunk_offset>=authentikey_certificate_size))
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                if (((short)(chunk_offset+chunk_size))>authentikey_certificate_size)
-                    ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-                Util.arrayCopyNonAtomic(authentikey_certificate, chunk_offset, buffer, (short)0, chunk_size);
-                return chunk_size; 
-                
-            default:
-                ISOException.throwIt(SW_INCORRECT_P2);
-                return (short)0; 
-        }
-    }
-    
-    /**
-     * This function locks the PKI config.
-     * Once it is locked, it is not possible to modify private key, certificate or allowed_card_AID.
-     *  
-     *  ins: 
-     *  p1: 0x00 
-     *  p2: 0x00 
-     *  data: [none]
-     *  return: [none]
-     */
-    private short lock_PKI(APDU apdu, byte[] buffer) {
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        personalizationDone=true;
-        return (short)0;
-    }
-    
-    /**
-     * This function performs a challenge-response to verify the authenticity of the device.
-     * The challenge is made of three parts: 
-     *          - a constant header
-     *          - a 32-byte challenge provided by the requester
-     *          - a 32-byte random nonce generated by the device
-     * The response is the signature over this challenge. 
-     * This signature can be verified with the certificate stored in the device.
-     * 
-     *  ins: 
-     *  p1: 0x00 
-     *  p2: 0x00 
-     *  data: [challenge1(32b)]
-     *  return: [challenge2(32b) | sig_size(2b) | sig]
-     */
-    private short challenge_response_pki(APDU apdu, byte[] buffer) {
-        // todo: require PIN?
-        if (!pins[0].isValidated())
-            ISOException.throwIt(SW_UNAUTHORIZED);
-        
-        short bytesLeft = Util.makeShort((byte) 0x00, buffer[ISO7816.OFFSET_LC]);
-        if (bytesLeft < (short)32)
-            ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
-        
-        //copy all data into array
-        short offset=(short)0;
-        Util.arrayCopyNonAtomic(PKI_CHALLENGE_MSG, (short)0, recvBuffer, offset, (short)PKI_CHALLENGE_MSG.length);
-        offset+=PKI_CHALLENGE_MSG.length;
-        randomData.generateData(recvBuffer, offset, (short)32);
-        offset+=(short)32;
-        Util.arrayCopyNonAtomic(buffer, ISO7816.OFFSET_CDATA, recvBuffer, offset, (short)32);
-        offset+=(short)32;
-         
-        //sign challenge
-        sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
-        short sign_size= sigECDSA.sign(recvBuffer, (short)0, offset, buffer, (short)34);
-        Util.setShort(buffer, (short)32, sign_size);
-        Util.arrayCopyNonAtomic(recvBuffer, (short)PKI_CHALLENGE_MSG.length, buffer, (short)0, (short)32);
-        
-        // verify response
-        sigECDSA.init(authentikey_public, Signature.MODE_VERIFY);
-        boolean is_valid= sigECDSA.verify(recvBuffer, (short)0, offset, buffer, (short)(34), sign_size);
-        if (!is_valid)
-            ISOException.throwIt(SW_SIGNATURE_INVALID);
-        
-        return (short)(32+2+sign_size);
-    }
+       //sign challenge
+       sigECDSA.init(authentikey_private, Signature.MODE_SIGN);
+       short sign_size= sigECDSA.sign(recvBuffer, (short)0, offset, buffer, (short)34);
+       Util.setShort(buffer, (short)32, sign_size);
+       Util.arrayCopyNonAtomic(recvBuffer, (short)PKI_CHALLENGE_MSG.length, buffer, (short)0, (short)32);
+       
+       // verify response
+       sigECDSA.init(authentikey_public, Signature.MODE_VERIFY);
+       boolean is_valid= sigECDSA.verify(recvBuffer, (short)0, offset, buffer, (short)(34), sign_size);
+       if (!is_valid)
+           ISOException.throwIt(SW_SIGNATURE_INVALID);
+       
+       return (short)(32+2+sign_size);
+   }
     
 } // end of class JAVA_APPLET
