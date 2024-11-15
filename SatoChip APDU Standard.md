@@ -609,7 +609,7 @@ This example requests the status of a card
 $ gp -a b03c000000 -d
 ...
 A>> T=1 (4+0000) B03C0000 00
-A<< (0012+2) (15ms) 000C00060000000000000001 9000
+A<< (0012+2) (15ms) 000C00060303030300000100 9000
 ...
 ```
 
@@ -619,14 +619,14 @@ This response can be parsed in JSON as:
 {
 	"protocolVersion": "000C",
     "appletVersion": "0006",
-    "pinRemainingTries0": "00",
-    "ublkRemainingTries0": "00",
-    "pinRemainingTries1": "00",
-    "ublkRemainingTries1": "00",
+    "pinRemainingTries0": "03",
+    "ublkRemainingTries0": "03",
+    "pinRemainingTries1": "03",
+    "ublkRemainingTries1": "03",
     "needs2FA": "00",
     "is_seeded": "00",
-    "setupDone": "00",
-    "needs_secure_channel": "01",
+    "setupDone": "01",
+    "needs_secure_channel": "00",
     "statusBytes": "9000",
     "statusBytesMsg": "Normal: No further qualification"
 }
@@ -1142,9 +1142,9 @@ $ gp -a b04200000430303030 -a b06eff030c0b68656c6c6f20776f726c64
 
 #### Response
 
-**Note**: For `Init`, no response.
+**Note**: For `Init` and `Update`, no response.
 
-**Note**: For `Finalize`
+**Note**: For `Finalize` TODO
 
 
 
@@ -1184,9 +1184,44 @@ This example is a request to parse the following transaction which is of length 
 }
 ```
 
+```bash
+$ gp -a b04200000430303030 -a b0710000e2020000000180b98c54dbab5106d5a1449f4e5fdb9146deca1d48e93d666c5d9290b7c37a3f010000006b483045022100f0e32ceb205a5056694611afcffe4c1f0e63e9c57382607045ff2c3d9b5b7b3f0220111f0323e56d7462a9299833166569f1a68e1f5090b49bea64f541c494109c6c012102d0648f06a31d47112f1ff7848c85ce54b772c513bc3337c98f081c19d3dca260ffffffff02006d7c4d000000001976a91474d463a046e3175142464740bad692fa0762a93e88accad5e5f1b50000001976a914c98fc6bd9c2fd88533f28e6797cfa2a0a0e18ecf88ac00000000
+...
+A>> T=1 (4+0004) B0420000 04 30303030
+A<< (0000+2) (26ms) 9000
+A>> T=1 (4+0226) B0710000 E2 020000000180B98C54DBAB5106D5A1449F4E5FDB9146DECA1D48E93D666C5D9290B7C37A3F010000006B483045022100F0E32CEB205A5056694611AFCFFE4C1F0E63E9C57382607045FF2C3D9B5B7B3F0220111F0323E56D7462A9299833166569F1A68E1F5090B49BEA64F541C494109C6C012102D0648F06A31D47112F1FF7848C85CE54B772C513BC3337C98F081C19D3DCA260FFFFFFFF02006D7C4D000000001976A91474D463A046E3175142464740BAD692FA0762A93E88ACCAD5E5F1B50000001976A914C98FC6BD9C2FD88533F28E6797CFA2A0A0E18ECF88AC00000000
+A<< (0020+2) (65ms) 000000010000000200000000000000B63F6242CA 9000
+...
+```
+
+This response can be parsed in JSON as:
+
+```json
+{
+    "_comment": "response for verifyPIN",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification",
+    
+    "_comment": "response for parseTransaction",
+    "hash_size": "0000",
+    "need2fa": "0001",
+    "sig_size": "0000",
+    "txcontext": "000200000000000000B63F6242CA",
+    "statusBytes": "9000",
+    "statusBytesMsg": "Normal: No further qualification"
+}
+```
+
 #### Response
 
-TODO
+| Name        | Description                                     | Length (bytes) |
+| ----------- | ----------------------------------------------- | -------------- |
+| `hash_size` | size of the transaction `hash`                  | 2              |
+| `hash`      | double SHA-256 `hash` of the parsed transaction | 32             |
+| `need2fa`   | indicates whether `2fa` is needed               | 2              |
+| `sig_size`  | length of the `signature`                       | 2              |
+| `sig`       | actual `signature` of the transaction `hash`    | var            |
+| `txcontext` | details about transaction context               | var            |
 
 ### 3.21 Instruction `signTransaction`
 
